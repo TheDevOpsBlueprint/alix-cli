@@ -1,4 +1,5 @@
 import click
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -7,6 +8,7 @@ from rich.prompt import Confirm
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
+from alix.porter import AliasPorter
 
 console = Console()
 storage = AliasStorage()
@@ -32,7 +34,6 @@ def add(name, command, description):
     alias = Alias(name=name, command=command, description=description)
     if storage.add(alias):
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
-        console.print(f"[dim]Run 'alix apply' to update your shell[/]")
     else:
         console.print(f"[red]✗[/] Alias '{name}' already exists!")
 
@@ -54,46 +55,50 @@ def remove(name, force):
 
     if storage.remove(name):
         console.print(f"[green]✓[/] Removed alias: [cyan]{name}[/]")
-        console.print(f"[dim]Run 'alix apply' to update your shell[/]")
 
 
-@main.command()
-@click.option("--dry-run", is_flag=True, help="Show what would be applied")
-def apply(dry_run):
-    """Apply aliases to your shell configuration"""
-    integrator = ShellIntegrator()
+@main.command(name="export")
+@click.argument("filename", type=click.Path())
+@click.option("--format", type=click.Choice(["json", "yaml"]), default="json")
+def export_aliases(filename, format):
+    """Export aliases to a file"""
+    porter = AliasPorter()
+    filepath = Path(filename)
 
-    if dry_run:
-        aliases = storage.list_all()
-        console.print(Panel.fit(
-            f"[cyan]Would apply {len(aliases)} aliases to {integrator.shell_type.value}[/]\n"
-            f"Target file: {integrator.get_target_file() or 'None'}",
-            title="Dry Run"
-        ))
-        for alias in aliases[:5]:  # Show first 5
-            console.print(f"  alias {alias.name}='{alias.command}'")
-        if len(aliases) > 5:
-            console.print(f"  ... and {len(aliases) - 5} more")
-        return
+    if filepath.suffix == "":
+        filepath = filepath.with_suffix(f".{format}")
 
-    success, message = integrator.apply_aliases()
+    success, message = porter.export_to_file(filepath, format)
     if success:
         console.print(f"[green]✓[/] {message}")
-        console.print("[yellow]Restart your shell or run:[/] source ~/.*rc")
+        console.print(f"[dim]Share this file to share your aliases![/]")
     else:
         console.print(f"[red]✗[/] {message}")
 
 
-@main.command()
-def export():
-    """Export aliases in shell format"""
-    integrator = ShellIntegrator()
-    aliases_text = integrator.export_aliases(integrator.shell_type)
+@main.command(name="import")
+@click.argument("filename", type=click.Path(exists=True))
+@click.option("--merge", is_flag=True, help="Merge with existing aliases")
+def import_aliases(filename, merge):
+    """Import aliases from a file"""
+    porter = AliasPorter()
+    filepath = Path(filename)
 
-    if aliases_text:
-        console.print(Panel(aliases_text, title=f"Aliases for {integrator.shell_type.value}"))
+    # Show preview
+    console.print(f"[cyan]Importing from:[/] {filepath.name}")
+
+    if not merge and storage.list_all():
+        console.print("[yellow]Warning:[/] This will replace existing aliases!")
+        if not Confirm.ask("Continue?"):
+            console.print("[red]Import cancelled[/]")
+            return
+
+    success, message = porter.import_from_file(filepath, merge)
+    if success:
+        console.print(f"[green]✓[/] {message}")
+        console.print(f"[dim]Run 'alix list' to see imported aliases[/]")
     else:
-        console.print("[yellow]No aliases to export[/]")
+        console.print(f"[red]✗[/] {message}")
 
 
 @main.command(name="list")
@@ -105,7 +110,7 @@ def list_aliases(verbose):
         console.print("[yellow]No aliases found.[/] Add one with 'alix add'")
         return
 
-    table = Table(title="📋 Your Aliases")
+    table = Table(title=f"📋 Your Aliases ({len(aliases)} total)")
     table.add_column("Name", style="cyan", no_wrap=True)
     table.add_column("Command", style="green")
     if verbose:
