@@ -1,15 +1,20 @@
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Grid
+from textual.containers import Container, Horizontal
 from textual.widgets import Header, Footer, DataTable, Input, Button, Label
 from textual.binding import Binding
 from textual.screen import ModalScreen
 
 from alix.storage import AliasStorage
 from alix.models import Alias
+from alix.config import Config
 
 
 class AddAliasScreen(ModalScreen):
     """Modal screen for adding a new alias"""
+
+    def __init__(self, theme_colors):
+        super().__init__()
+        self.theme_colors = theme_colors
 
     CSS = """
     AddAliasScreen {
@@ -23,20 +28,12 @@ class AddAliasScreen(ModalScreen):
         background: $surface;
         padding: 1 2;
     }
-
-    #dialog Input {
-        margin: 1 0;
-    }
-
-    #dialog Button {
-        margin: 1 1;
-    }
     """
 
     def compose(self) -> ComposeResult:
         """Create add alias form"""
         with Container(id="dialog"):
-            yield Label("[bold cyan]Add New Alias[/]")
+            yield Label(f"[bold {self.theme_colors['header_color']}]Add New Alias[/]")
             yield Input(placeholder="Alias name (e.g., ll)", id="name")
             yield Input(placeholder="Command (e.g., ls -la)", id="command")
             yield Input(placeholder="Description (optional)", id="description")
@@ -55,8 +52,6 @@ class AddAliasScreen(ModalScreen):
                               description=self.query_one("#description", Input).value or None)
                 if storage.add(alias):
                     self.dismiss(True)
-                else:
-                    self.query_one("#name", Input).placeholder = f"'{name}' already exists!"
         else:
             self.dismiss(False)
 
@@ -64,49 +59,60 @@ class AddAliasScreen(ModalScreen):
 class AliasManager(App):
     """Interactive alias manager TUI"""
 
-    CSS = """
-    DataTable {
-        height: 1fr;
-        border: solid cyan;
-    }
+    def __init__(self):
+        super().__init__()
+        self.config = Config()
+        self.theme_colors = self.config.get_theme()  # Changed from self.theme
+        self.storage = AliasStorage()
+        self.title = "alix - Alias Manager"
+        self.selected_alias = None
+        self.search_term = ""
 
-    #details {
-        height: 3;
-        border: solid yellow;
-        padding: 0 1;
-    }
+    def get_css(self) -> str:
+        """Dynamic CSS based on theme"""
+        return f"""
+        DataTable {{
+            height: 1fr;
+            border: solid {self.theme_colors['border_color']};
+        }}
 
-    #footer-bar {
-        height: 3;
-        dock: bottom;
-        border: solid green;
-        margin: 1 0;
-        padding: 0 1;
-    }
-    """
+        #details {{
+            height: 3;
+            border: solid {self.theme_colors['selected_color']};
+            padding: 0 1;
+        }}
+
+        #footer-bar {{
+            height: 3;
+            dock: bottom;
+            border: solid {self.theme_colors['success_color']};
+            margin: 1 0;
+            padding: 0 1;
+        }}
+
+        #search.active {{
+            border: solid {self.theme_colors['search_color']};
+        }}
+        """
+
+    CSS = property(get_css)
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("a", "add_alias", "Add"),
         Binding("s", "focus_search", "Search"),
         Binding("d", "delete_alias", "Delete"),
-        Binding("r", "refresh", "Refresh"),
+        Binding("t", "cycle_theme", "Theme"),
         Binding("escape", "clear_search", "Clear"),
     ]
 
-    def __init__(self):
-        super().__init__()
-        self.storage = AliasStorage()
-        self.title = "alix - Alias Manager"
-        self.selected_alias = None
-        self.search_term = ""
-
     def compose(self) -> ComposeResult:
         """Create UI layout"""
+        theme_name = self.config.get("theme", "default")
         yield Header()
         yield Container(
             DataTable(id="alias-table", cursor_type="row"),
-            Label("[dim]Select an alias to see details[/]", id="details"),
+            Label(f"[dim]Theme: {theme_name} | Press 't' to change[/]", id="details"),
             Horizontal(
                 Input(placeholder="Search (press 's')...", id="search"),
                 Button("Add (a)", id="add-btn", variant="primary"),
@@ -134,10 +140,40 @@ class AliasManager(App):
             aliases = [a for a in aliases if search_lower in a.name.lower()
                        or search_lower in a.command.lower()]
 
-        self.sub_title = f"{len(aliases)} aliases" + (f" (filtered)" if search else "")
+        self.sub_title = f"{len(aliases)} aliases | Theme: {self.config.get('theme')}"
 
         for alias in aliases:
-            table.add_row(alias.name, alias.command, alias.description or "-", key=alias.name)
+            desc = alias.description[:30] + "..." if alias.description and len(alias.description) > 30 else (
+                        alias.description or "-")
+            table.add_row(alias.name, alias.command, desc, key=alias.name)
+
+    def action_add_alias(self) -> None:
+        """Show add alias dialog"""
+
+        def check_result(result: bool) -> None:
+            if result:
+                self.refresh_table(self.search_term)
+
+        self.push_screen(AddAliasScreen(self.theme_colors), check_result)
+
+    def action_delete_alias(self) -> None:
+        """Delete selected alias"""
+        if self.selected_alias and self.storage.remove(self.selected_alias.name):
+            self.refresh_table(self.search_term)
+
+    def action_cycle_theme(self) -> None:
+        """Cycle through available themes"""
+        themes = list(Config.THEMES.keys())
+        current = self.config.get("theme", "default")
+        next_idx = (themes.index(current) + 1) % len(themes)
+        next_theme = themes[next_idx]
+
+        self.config.set("theme", next_theme)
+        self.theme_colors = self.config.get_theme()  # Changed from self.theme
+
+        details = self.query_one("#details", Label)
+        details.update(f"[{self.theme_colors['success_color']}]Theme changed to: {next_theme}[/]")
+        self.refresh_table(self.search_term)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle search input changes"""
@@ -149,27 +185,6 @@ class AliasManager(App):
         """Handle row selection"""
         if event.row_key:
             self.selected_alias = self.storage.get(str(event.row_key.value))
-            if self.selected_alias:
-                details = self.query_one("#details", Label)
-                details.update(f"[cyan]{self.selected_alias.name}[/]: {self.selected_alias.command}")
-
-    def action_add_alias(self) -> None:
-        """Show add alias dialog"""
-
-        def check_result(result: bool) -> None:
-            if result:
-                self.refresh_table(self.search_term)
-
-        self.push_screen(AddAliasScreen(), check_result)
-
-    def action_delete_alias(self) -> None:
-        """Delete selected alias"""
-        if self.selected_alias:
-            if self.storage.remove(self.selected_alias.name):
-                self.refresh_table(self.search_term)
-                details = self.query_one("#details", Label)
-                details.update(f"[red]Deleted:[/] {self.selected_alias.name}")
-                self.selected_alias = None
 
     def action_focus_search(self) -> None:
         """Focus search input"""
