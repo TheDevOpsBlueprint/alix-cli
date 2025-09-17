@@ -1,10 +1,13 @@
 import click
 from pathlib import Path
+from datetime import datetime
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Confirm
+from rich.markdown import Markdown
 
+from alix import __version__
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
@@ -18,9 +21,12 @@ config = Config()
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-@click.version_option(version="0.1.0", prog_name="alix")
+@click.version_option(version=__version__, prog_name="alix")
 def main(ctx):
-    """alix - Interactive alias manager for your shell 🚀"""
+    """alix - Interactive alias manager for your shell 🚀
+
+    Run without commands to launch interactive TUI mode.
+    """
     if ctx.invoked_subcommand is None:
         from alix.tui import AliasManager
         app = AliasManager()
@@ -32,7 +38,7 @@ def main(ctx):
 @click.option("--command", "-c", prompt=True, help="Command to alias")
 @click.option("--description", "-d", help="Description of the alias")
 def add(name, command, description):
-    """Add a new alias"""
+    """Add a new alias to your collection"""
     alias = Alias(name=name, command=command, description=description)
     if storage.add(alias):
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
@@ -41,88 +47,97 @@ def add(name, command, description):
 
 
 @main.command()
-@click.argument("name")
-@click.option("--force", "-f", is_flag=True, help="Skip confirmation")
-def remove(name, force):
-    """Remove an alias"""
-    if not force and config.get("confirm_delete", True):
-        if not Confirm.ask(f"Remove alias '{name}'?"):
-            return
+def stats():
+    """Show statistics about your aliases"""
+    aliases = storage.list_all()
 
-    if storage.remove(name):
-        console.print(f"[green]✓[/] Removed alias: [cyan]{name}[/]")
+    if not aliases:
+        console.print("[yellow]No aliases yet![/] Start with 'alix add'")
+        return
+
+    # Calculate statistics
+    total = len(aliases)
+    total_chars_saved = sum(len(a.command) - len(a.name) for a in aliases)
+    avg_length = sum(len(a.command) for a in aliases) / total if total > 0 else 0
+    most_used = max(aliases, key=lambda a: a.used_count) if aliases else None
+    newest = max(aliases, key=lambda a: a.created_at) if aliases else None
+
+    # Shell distribution
+    shells = {}
+    for alias in aliases:
+        shell = alias.shell or "unspecified"
+        shells[shell] = shells.get(shell, 0) + 1
+
+    # Create stats panel
+    stats_text = f"""
+[bold cyan]📊 Alias Statistics[/]
+
+[yellow]Total Aliases:[/] {total}
+[yellow]Characters Saved:[/] ~{total_chars_saved:,} keystrokes
+[yellow]Average Command Length:[/] {avg_length:.1f} chars
+[yellow]Most Used:[/] {most_used.name if most_used else 'N/A'} ({most_used.used_count} times)
+[yellow]Newest:[/] {newest.name if newest else 'N/A'}
+[yellow]Storage:[/] {storage.storage_path.name}
+[yellow]Backups:[/] {len(list(storage.backup_dir.glob('*.json')))} files
+
+[bold]Top Commands by Length Saved:[/]"""
+
+    console.print(Panel.fit(stats_text, border_style="cyan"))
+
+    # Show top 5 space savers
+    sorted_aliases = sorted(aliases, key=lambda a: len(a.command) - len(a.name), reverse=True)[:5]
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    for i, alias in enumerate(sorted_aliases, 1):
+        saved = len(alias.command) - len(alias.name)
+        table.add_row(
+            f"{i}.",
+            f"[cyan]{alias.name}[/]",
+            f"saves {saved} chars",
+            f"[dim]({alias.command[:30]}...)[/]" if len(alias.command) > 30 else f"[dim]({alias.command})[/]"
+        )
+    console.print(table)
 
 
-@main.command(name="config")
-@click.option("--list", "list_config", is_flag=True, help="List all settings")
-@click.option("--set", "set_key", help="Setting to change")
-@click.option("--value", help="New value for setting")
-@click.option("--themes", is_flag=True, help="List available themes")
-def configure(list_config, set_key, value, themes):
-    """Manage alix configuration"""
-    if themes:
-        table = Table(title="Available Themes")
-        table.add_column("Theme", style="cyan")
-        table.add_column("Description", style="dim")
+@main.command()
+def about():
+    """About alix and quick help"""
+    about_text = f"""
+# 🚀 alix v{__version__}
 
-        themes_info = {
-            "default": "Classic cyan theme",
-            "ocean": "Blue ocean colors",
-            "forest": "Green forest theme",
-            "monochrome": "Black and white"
-        }
+**Interactive alias manager for your shell**
 
-        current = config.get("theme", "default")
-        for theme_name, desc in themes_info.items():
-            if theme_name == current:
-                table.add_row(f"► {theme_name}", f"{desc} [current]")
-            else:
-                table.add_row(f"  {theme_name}", desc)
+## Quick Start
+- Run `alix` to launch interactive TUI
+- Press `?` in TUI for keyboard shortcuts
+- Use `alix add` to add aliases from CLI
+- Use `alix apply` to update your shell config
 
-        console.print(table)
-        console.print("\n[dim]Change theme in TUI with 't' key or:[/]")
-        console.print("alix config --set theme --value ocean")
+## Key Features
+✨ Interactive TUI with search and filtering
+🎨 Beautiful themes (press 't' in TUI)
+💾 Auto-backup before changes
+📤 Export/import alias collections
+🐚 Multi-shell support (bash, zsh, fish)
 
-    elif list_config:
-        table = Table(title="Current Configuration")
-        table.add_column("Setting", style="cyan")
-        table.add_column("Value", style="green")
-        table.add_column("Description", style="dim")
+## Commands
+- `alix` - Launch interactive TUI
+- `alix add` - Add new alias
+- `alix list` - List all aliases
+- `alix remove` - Remove an alias
+- `alix apply` - Apply to shell config
+- `alix export/import` - Share collections
+- `alix stats` - View statistics
+- `alix config` - Manage settings
 
-        descriptions = {
-            "theme": "Color theme for TUI",
-            "auto_backup": "Create backups automatically",
-            "confirm_delete": "Ask before deleting",
-            "show_descriptions": "Show descriptions in TUI",
-            "max_backups": "Maximum backup files to keep"
-        }
-
-        for key, value in config.config.items():
-            desc = descriptions.get(key, "")
-            table.add_row(key, str(value), desc)
-
-        console.print(table)
-
-    elif set_key and value is not None:
-        # Type conversion for known boolean/int settings
-        if set_key in ["auto_backup", "confirm_delete", "show_descriptions"]:
-            value = value.lower() in ["true", "yes", "1", "on"]
-        elif set_key == "max_backups":
-            value = int(value)
-
-        config.set(set_key, value)
-        console.print(f"[green]✓[/] Set {set_key} = {value}")
-
-        if set_key == "theme":
-            console.print("[dim]Restart TUI to see theme changes[/]")
-
-    else:
-        console.print("Use --list to see settings or --set with --value to change")
+## Learn More
+GitHub: https://github.com/TheDevOpsBlueprint/alix-cli
+    """
+    console.print(Markdown(about_text))
 
 
 @main.command(name="list")
 def list_aliases():
-    """List all aliases"""
+    """List all aliases in a beautiful table"""
     aliases = storage.list_all()
     if not aliases:
         console.print("[yellow]No aliases found.[/] Add one with 'alix add'")
@@ -142,6 +157,7 @@ def list_aliases():
             table.add_row(alias.name, alias.command)
 
     console.print(table)
+    console.print(f"\n[dim]💡 Tip: Run 'alix' for interactive mode![/]")
 
 
 if __name__ == "__main__":
