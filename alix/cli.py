@@ -3,15 +3,17 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
 from alix.porter import AliasPorter
+from alix.config import Config
 
 console = Console()
 storage = AliasStorage()
+config = Config()
 
 
 @click.group(invoke_without_command=True)
@@ -43,83 +45,100 @@ def add(name, command, description):
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
 def remove(name, force):
     """Remove an alias"""
-    alias = storage.get(name)
-    if not alias:
-        console.print(f"[red]✗[/] Alias '{name}' not found!")
-        return
-
-    if not force:
-        if not Confirm.ask(f"Remove alias '{name}' ({alias.command})?"):
-            console.print("[yellow]Cancelled[/]")
+    if not force and config.get("confirm_delete", True):
+        if not Confirm.ask(f"Remove alias '{name}'?"):
             return
 
     if storage.remove(name):
         console.print(f"[green]✓[/] Removed alias: [cyan]{name}[/]")
 
 
-@main.command(name="export")
-@click.argument("filename", type=click.Path())
-@click.option("--format", type=click.Choice(["json", "yaml"]), default="json")
-def export_aliases(filename, format):
-    """Export aliases to a file"""
-    porter = AliasPorter()
-    filepath = Path(filename)
+@main.command(name="config")
+@click.option("--list", "list_config", is_flag=True, help="List all settings")
+@click.option("--set", "set_key", help="Setting to change")
+@click.option("--value", help="New value for setting")
+@click.option("--themes", is_flag=True, help="List available themes")
+def configure(list_config, set_key, value, themes):
+    """Manage alix configuration"""
+    if themes:
+        table = Table(title="Available Themes")
+        table.add_column("Theme", style="cyan")
+        table.add_column("Description", style="dim")
 
-    if filepath.suffix == "":
-        filepath = filepath.with_suffix(f".{format}")
+        themes_info = {
+            "default": "Classic cyan theme",
+            "ocean": "Blue ocean colors",
+            "forest": "Green forest theme",
+            "monochrome": "Black and white"
+        }
 
-    success, message = porter.export_to_file(filepath, format)
-    if success:
-        console.print(f"[green]✓[/] {message}")
-        console.print(f"[dim]Share this file to share your aliases![/]")
+        current = config.get("theme", "default")
+        for theme_name, desc in themes_info.items():
+            if theme_name == current:
+                table.add_row(f"► {theme_name}", f"{desc} [current]")
+            else:
+                table.add_row(f"  {theme_name}", desc)
+
+        console.print(table)
+        console.print("\n[dim]Change theme in TUI with 't' key or:[/]")
+        console.print("alix config --set theme --value ocean")
+
+    elif list_config:
+        table = Table(title="Current Configuration")
+        table.add_column("Setting", style="cyan")
+        table.add_column("Value", style="green")
+        table.add_column("Description", style="dim")
+
+        descriptions = {
+            "theme": "Color theme for TUI",
+            "auto_backup": "Create backups automatically",
+            "confirm_delete": "Ask before deleting",
+            "show_descriptions": "Show descriptions in TUI",
+            "max_backups": "Maximum backup files to keep"
+        }
+
+        for key, value in config.config.items():
+            desc = descriptions.get(key, "")
+            table.add_row(key, str(value), desc)
+
+        console.print(table)
+
+    elif set_key and value is not None:
+        # Type conversion for known boolean/int settings
+        if set_key in ["auto_backup", "confirm_delete", "show_descriptions"]:
+            value = value.lower() in ["true", "yes", "1", "on"]
+        elif set_key == "max_backups":
+            value = int(value)
+
+        config.set(set_key, value)
+        console.print(f"[green]✓[/] Set {set_key} = {value}")
+
+        if set_key == "theme":
+            console.print("[dim]Restart TUI to see theme changes[/]")
+
     else:
-        console.print(f"[red]✗[/] {message}")
-
-
-@main.command(name="import")
-@click.argument("filename", type=click.Path(exists=True))
-@click.option("--merge", is_flag=True, help="Merge with existing aliases")
-def import_aliases(filename, merge):
-    """Import aliases from a file"""
-    porter = AliasPorter()
-    filepath = Path(filename)
-
-    # Show preview
-    console.print(f"[cyan]Importing from:[/] {filepath.name}")
-
-    if not merge and storage.list_all():
-        console.print("[yellow]Warning:[/] This will replace existing aliases!")
-        if not Confirm.ask("Continue?"):
-            console.print("[red]Import cancelled[/]")
-            return
-
-    success, message = porter.import_from_file(filepath, merge)
-    if success:
-        console.print(f"[green]✓[/] {message}")
-        console.print(f"[dim]Run 'alix list' to see imported aliases[/]")
-    else:
-        console.print(f"[red]✗[/] {message}")
+        console.print("Use --list to see settings or --set with --value to change")
 
 
 @main.command(name="list")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
-def list_aliases(verbose):
+def list_aliases():
     """List all aliases"""
     aliases = storage.list_all()
     if not aliases:
         console.print("[yellow]No aliases found.[/] Add one with 'alix add'")
         return
 
+    theme = config.get_theme()
     table = Table(title=f"📋 Your Aliases ({len(aliases)} total)")
-    table.add_column("Name", style="cyan", no_wrap=True)
-    table.add_column("Command", style="green")
-    if verbose:
-        table.add_column("Description", style="dim")
+    table.add_column("Name", style=theme['header_color'], no_wrap=True)
+    table.add_column("Command", style=theme['success_color'])
 
-    for alias in sorted(aliases, key=lambda a: a.name):
-        if verbose:
+    if config.get("show_descriptions", True):
+        table.add_column("Description", style="dim")
+        for alias in sorted(aliases, key=lambda a: a.name):
             table.add_row(alias.name, alias.command, alias.description or "")
-        else:
+    else:
+        for alias in sorted(aliases, key=lambda a: a.name):
             table.add_row(alias.name, alias.command)
 
     console.print(table)
