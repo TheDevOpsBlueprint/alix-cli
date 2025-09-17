@@ -16,12 +16,10 @@ storage = AliasStorage()
 def main(ctx):
     """alix - Interactive alias manager for your shell 🚀"""
     if ctx.invoked_subcommand is None:
-        console.print(Panel.fit(
-            "[bold cyan]Interactive mode coming soon![/]\n"
-            "Use 'alix --help' to see available commands.",
-            title="🚀 alix",
-            border_style="cyan"
-        ))
+        # Launch interactive TUI
+        from alix.tui import AliasManager
+        app = AliasManager()
+        app.run()
 
 
 @main.command()
