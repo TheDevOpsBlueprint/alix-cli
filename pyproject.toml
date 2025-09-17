@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alix-cli"
+version = "0.1.0"
+description = "Interactive alias manager for your shell"
+authors = [{name = "TheDevOpsBlueprint"}]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "textual>=0.40.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+]
+
+[project.scripts]
+alix = "alix.cli:main"
