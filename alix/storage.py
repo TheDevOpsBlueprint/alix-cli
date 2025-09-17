@@ -1,6 +1,5 @@
-"""Storage layer for aliases using JSON"""
-
 import json
+import shutil
 from pathlib import Path
 from typing import List, Optional, Dict
 from datetime import datetime
@@ -21,8 +20,34 @@ class AliasStorage:
             self.storage_path = self.storage_dir / "aliases.json"
             self.storage_dir.mkdir(exist_ok=True)
 
+        self.backup_dir = self.storage_path.parent / "backups"
+        self.backup_dir.mkdir(exist_ok=True)
+
         self.aliases: Dict[str, Alias] = {}
         self.load()
+
+    def create_backup(self) -> Optional[Path]:
+        """Create timestamped backup of current aliases"""
+        if not self.storage_path.exists() or not self.aliases:
+            return None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = self.backup_dir / f"aliases_{timestamp}.json"
+
+        try:
+            shutil.copy2(self.storage_path, backup_path)
+            # Keep only last 10 backups
+            self.cleanup_old_backups(keep=10)
+            return backup_path
+        except Exception:
+            return None
+
+    def cleanup_old_backups(self, keep: int = 10) -> None:
+        """Remove old backups, keeping only the most recent ones"""
+        backups = sorted(self.backup_dir.glob("aliases_*.json"))
+        if len(backups) > keep:
+            for backup in backups[:-keep]:
+                backup.unlink()
 
     def load(self) -> None:
         """Load aliases from JSON file"""
@@ -34,9 +59,9 @@ class AliasStorage:
                         name: Alias.from_dict(alias_data)
                         for name, alias_data in data.items()
                     }
-            except (json.JSONDecodeError, Exception) as e:
+            except (json.JSONDecodeError, Exception):
                 # If file is corrupted, start fresh but backup old file
-                backup_path = self.storage_path.with_suffix('.backup')
+                backup_path = self.storage_path.with_suffix('.corrupted')
                 if self.storage_path.exists():
                     self.storage_path.rename(backup_path)
                 self.aliases = {}
@@ -58,6 +83,7 @@ class AliasStorage:
         """Add a new alias, return True if successful"""
         if alias.name in self.aliases:
             return False
+        self.create_backup()  # Backup before modification
         self.aliases[alias.name] = alias
         self.save()
         return True
@@ -65,6 +91,7 @@ class AliasStorage:
     def remove(self, name: str) -> bool:
         """Remove an alias, return True if it existed"""
         if name in self.aliases:
+            self.create_backup()  # Backup before modification
             del self.aliases[name]
             self.save()
             return True
@@ -81,3 +108,13 @@ class AliasStorage:
     def clear_test_alias(self) -> None:
         """Remove test alias if it exists (for safe testing)"""
         self.remove(TEST_ALIAS_NAME)
+
+    def restore_latest_backup(self) -> bool:
+        """Restore from the most recent backup"""
+        backups = sorted(self.backup_dir.glob("aliases_*.json"))
+        if backups:
+            latest_backup = backups[-1]
+            shutil.copy2(latest_backup, self.storage_path)
+            self.load()
+            return True
+        return False
