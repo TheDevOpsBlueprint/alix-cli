@@ -1,5 +1,3 @@
-"""Configuration management for alix"""
-
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -19,27 +17,27 @@ class Config:
         },
         "ocean": {
             "border_color": "blue",
-            "header_color": "dodgerblue",  # Changed from bright_blue
+            "header_color": "bright_blue",  # Rich-compatible
             "selected_color": "cyan",
-            "search_color": "turquoise",  # Changed from bright_cyan
+            "search_color": "bright_cyan",   # Rich-compatible
             "success_color": "green",
-            "error_color": "crimson",  # Changed from bright_red
+            "error_color": "bright_red",     # Rich-compatible
         },
         "forest": {
             "border_color": "green",
-            "header_color": "chartreuse",  # Changed from bright_green
+            "header_color": "bright_green",  # Rich-compatible
             "selected_color": "yellow",
-            "search_color": "gold",  # Changed from bright_yellow
-            "success_color": "lime",  # Changed from bright_green
+            "search_color": "bright_yellow",  # Rich-compatible
+            "success_color": "bright_green",  # Rich-compatible
             "error_color": "red",
         },
         "monochrome": {
             "border_color": "white",
-            "header_color": "white",  # Changed from bright_white
+            "header_color": "bright_white",   # Rich-compatible
             "selected_color": "white",
-            "search_color": "white",  # Changed from bright_white
+            "search_color": "bright_white",    # Rich-compatible
             "success_color": "white",
-            "error_color": "white",  # Changed from bright_white
+            "error_color": "bright_white",     # Rich-compatible
         }
     }
 
