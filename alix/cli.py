@@ -4,8 +4,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Confirm
 
-from alix.models import Alias, TEST_ALIAS_NAME
+from alix.models import Alias
 from alix.storage import AliasStorage
+from alix.shell_integrator import ShellIntegrator
 
 console = Console()
 storage = AliasStorage()
@@ -17,7 +18,6 @@ storage = AliasStorage()
 def main(ctx):
     """alix - Interactive alias manager for your shell 🚀"""
     if ctx.invoked_subcommand is None:
-        # Launch interactive TUI
         from alix.tui import AliasManager
         app = AliasManager()
         app.run()
@@ -32,8 +32,7 @@ def add(name, command, description):
     alias = Alias(name=name, command=command, description=description)
     if storage.add(alias):
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
-        backup = storage.backup_dir / "backups"
-        console.print(f"[dim]Backup created in {backup}[/]")
+        console.print(f"[dim]Run 'alix apply' to update your shell[/]")
     else:
         console.print(f"[red]✗[/] Alias '{name}' already exists!")
 
@@ -55,17 +54,46 @@ def remove(name, force):
 
     if storage.remove(name):
         console.print(f"[green]✓[/] Removed alias: [cyan]{name}[/]")
-        console.print(f"[dim]Backup created. Use 'alix restore' if needed[/]")
+        console.print(f"[dim]Run 'alix apply' to update your shell[/]")
 
 
 @main.command()
-def restore():
-    """Restore from latest backup"""
-    if storage.restore_latest_backup():
-        console.print("[green]✓[/] Restored from latest backup")
-        console.print(f"[cyan]{len(storage.list_all())}[/] aliases restored")
+@click.option("--dry-run", is_flag=True, help="Show what would be applied")
+def apply(dry_run):
+    """Apply aliases to your shell configuration"""
+    integrator = ShellIntegrator()
+
+    if dry_run:
+        aliases = storage.list_all()
+        console.print(Panel.fit(
+            f"[cyan]Would apply {len(aliases)} aliases to {integrator.shell_type.value}[/]\n"
+            f"Target file: {integrator.get_target_file() or 'None'}",
+            title="Dry Run"
+        ))
+        for alias in aliases[:5]:  # Show first 5
+            console.print(f"  alias {alias.name}='{alias.command}'")
+        if len(aliases) > 5:
+            console.print(f"  ... and {len(aliases) - 5} more")
+        return
+
+    success, message = integrator.apply_aliases()
+    if success:
+        console.print(f"[green]✓[/] {message}")
+        console.print("[yellow]Restart your shell or run:[/] source ~/.*rc")
     else:
-        console.print("[red]✗[/] No backups found!")
+        console.print(f"[red]✗[/] {message}")
+
+
+@main.command()
+def export():
+    """Export aliases in shell format"""
+    integrator = ShellIntegrator()
+    aliases_text = integrator.export_aliases(integrator.shell_type)
+
+    if aliases_text:
+        console.print(Panel(aliases_text, title=f"Aliases for {integrator.shell_type.value}"))
+    else:
+        console.print("[yellow]No aliases to export[/]")
 
 
 @main.command(name="list")
@@ -90,16 +118,6 @@ def list_aliases(verbose):
             table.add_row(alias.name, alias.command)
 
     console.print(table)
-
-
-@main.command()
-def backup():
-    """Create a manual backup"""
-    backup_path = storage.create_backup()
-    if backup_path:
-        console.print(f"[green]✓[/] Backup created: {backup_path.name}")
-    else:
-        console.print("[yellow]No aliases to backup[/]")
 
 
 if __name__ == "__main__":
