@@ -1,29 +1,26 @@
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal
-from textual.widgets import Header, Footer, DataTable, Input, Button, Label
+from textual.containers import Container, Horizontal, Vertical
+from textual.widgets import Header, Footer, DataTable, Input, Button, Label, Static
 from textual.binding import Binding
-from textual.screen import ModalScreen
+from textual.screen import Screen, ModalScreen
 
+from alix import __version__
 from alix.storage import AliasStorage
 from alix.models import Alias
 from alix.config import Config
 
 
-class AddAliasScreen(ModalScreen):
-    """Modal screen for adding a new alias"""
-
-    def __init__(self, theme_colors):
-        super().__init__()
-        self.theme_colors = theme_colors
+class HelpScreen(ModalScreen):
+    """Help screen showing keyboard shortcuts"""
 
     CSS = """
-    AddAliasScreen {
+    HelpScreen {
         align: center middle;
     }
 
-    #dialog {
+    #help-dialog {
         width: 60;
-        height: 11;
+        height: 20;
         border: thick $background 80%;
         background: $surface;
         padding: 1 2;
@@ -31,29 +28,36 @@ class AddAliasScreen(ModalScreen):
     """
 
     def compose(self) -> ComposeResult:
-        """Create add alias form"""
-        with Container(id="dialog"):
-            yield Label(f"[bold {self.theme_colors['header_color']}]Add New Alias[/]")
-            yield Input(placeholder="Alias name (e.g., ll)", id="name")
-            yield Input(placeholder="Command (e.g., ls -la)", id="command")
-            yield Input(placeholder="Description (optional)", id="description")
-            with Horizontal():
-                yield Button("Save", variant="primary", id="save")
-                yield Button("Cancel", variant="default", id="cancel")
+        """Create help content"""
+        help_text = """
+[bold cyan]⌨️  Keyboard Shortcuts[/]
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press"""
-        if event.button.id == "save":
-            name = self.query_one("#name", Input).value
-            command = self.query_one("#command", Input).value
-            if name and command:
-                storage = AliasStorage()
-                alias = Alias(name=name, command=command,
-                              description=self.query_one("#description", Input).value or None)
-                if storage.add(alias):
-                    self.dismiss(True)
-        else:
-            self.dismiss(False)
+[yellow]Navigation:[/]
+  ↑/↓     Navigate aliases
+  Enter   Copy selected command
+  Tab     Move between elements
+
+[yellow]Actions:[/]
+  a       Add new alias
+  d       Delete selected alias
+  s       Focus search box
+  t       Cycle themes
+  r       Refresh list
+
+[yellow]General:[/]
+  ?       Show this help
+  ESC     Clear search / Close dialogs
+  q       Quit application
+
+[dim]Press ESC to close this help[/]
+"""
+        with Container(id="help-dialog"):
+            yield Static(help_text)
+
+    def on_key(self, event) -> None:
+        """Close on any key press"""
+        if event.key == "escape":
+            self.dismiss()
 
 
 class AliasManager(App):
@@ -62,9 +66,9 @@ class AliasManager(App):
     def __init__(self):
         super().__init__()
         self.config = Config()
-        self.theme_colors = self.config.get_theme()  # Changed from self.theme
+        self.theme_colors = self.config.get_theme()
         self.storage = AliasStorage()
-        self.title = "alix - Alias Manager"
+        self.title = f"alix v{__version__}"
         self.selected_alias = None
         self.search_term = ""
 
@@ -76,7 +80,7 @@ class AliasManager(App):
             border: solid {self.theme_colors['border_color']};
         }}
 
-        #details {{
+        #status-bar {{
             height: 3;
             border: solid {self.theme_colors['selected_color']};
             padding: 0 1;
@@ -101,22 +105,26 @@ class AliasManager(App):
         Binding("q", "quit", "Quit"),
         Binding("a", "add_alias", "Add"),
         Binding("s", "focus_search", "Search"),
-        Binding("d", "delete_alias", "Delete"),
-        Binding("t", "cycle_theme", "Theme"),
-        Binding("escape", "clear_search", "Clear"),
+        Binding("d", "delete", "Delete"),
+        Binding("t", "theme", "Theme"),
+        Binding("?", "help", "Help"),
+        Binding("escape", "clear", "Clear"),
     ]
 
     def compose(self) -> ComposeResult:
         """Create UI layout"""
-        theme_name = self.config.get("theme", "default")
+        aliases_count = len(self.storage.list_all())
         yield Header()
         yield Container(
             DataTable(id="alias-table", cursor_type="row"),
-            Label(f"[dim]Theme: {theme_name} | Press 't' to change[/]", id="details"),
+            Label(
+                f"[dim]{aliases_count} aliases | Theme: {self.config.get('theme')} | Press ? for help[/]",
+                id="status-bar"
+            ),
             Horizontal(
-                Input(placeholder="Search (press 's')...", id="search"),
-                Button("Add (a)", id="add-btn", variant="primary"),
-                Button("Delete (d)", id="del-btn", variant="error"),
+                Input(placeholder="🔍 Search aliases...", id="search"),
+                Button("➕ Add", variant="primary"),
+                Button("🗑️ Delete", variant="error"),
                 id="footer-bar"
             )
         )
@@ -128,8 +136,12 @@ class AliasManager(App):
         table.add_columns("Name", "Command", "Description")
         self.refresh_table()
 
+        # Update subtitle with stats
+        total = len(self.storage.list_all())
+        self.sub_title = f"{total} aliases | v{__version__}"
+
     def refresh_table(self, search: str = "") -> None:
-        """Refresh the alias table with optional search filter"""
+        """Refresh the alias table"""
         table = self.query_one("#alias-table", DataTable)
         table.clear()
 
@@ -140,56 +152,61 @@ class AliasManager(App):
             aliases = [a for a in aliases if search_lower in a.name.lower()
                        or search_lower in a.command.lower()]
 
-        self.sub_title = f"{len(aliases)} aliases | Theme: {self.config.get('theme')}"
+        # Update status bar
+        status = self.query_one("#status-bar", Label)
+        if search:
+            status.update(
+                f"[yellow]Found {len(aliases)} matches[/] | Theme: {self.config.get('theme')} | Press ? for help")
+        else:
+            status.update(f"[dim]{len(aliases)} aliases | Theme: {self.config.get('theme')} | Press ? for help[/]")
 
         for alias in aliases:
             desc = alias.description[:30] + "..." if alias.description and len(alias.description) > 30 else (
-                        alias.description or "-")
+                        alias.description or "")
             table.add_row(alias.name, alias.command, desc, key=alias.name)
 
-    def action_add_alias(self) -> None:
-        """Show add alias dialog"""
+    def action_help(self) -> None:
+        """Show help screen"""
+        self.push_screen(HelpScreen())
 
-        def check_result(result: bool) -> None:
-            if result:
-                self.refresh_table(self.search_term)
-
-        self.push_screen(AddAliasScreen(self.theme_colors), check_result)
-
-    def action_delete_alias(self) -> None:
-        """Delete selected alias"""
-        if self.selected_alias and self.storage.remove(self.selected_alias.name):
-            self.refresh_table(self.search_term)
-
-    def action_cycle_theme(self) -> None:
-        """Cycle through available themes"""
+    def action_theme(self) -> None:
+        """Cycle through themes"""
         themes = list(Config.THEMES.keys())
         current = self.config.get("theme", "default")
         next_idx = (themes.index(current) + 1) % len(themes)
         next_theme = themes[next_idx]
 
         self.config.set("theme", next_theme)
-        self.theme_colors = self.config.get_theme()  # Changed from self.theme
+        self.theme_colors = self.config.get_theme()
 
-        details = self.query_one("#details", Label)
-        details.update(f"[{self.theme_colors['success_color']}]Theme changed to: {next_theme}[/]")
+        # Show theme change notification
+        status = self.query_one("#status-bar", Label)
+        status.update(f"[{self.theme_colors['success_color']}]✨ Theme changed to: {next_theme}[/]")
         self.refresh_table(self.search_term)
+
+    def on_data_table_row_highlighted(self, event) -> None:
+        """Handle row selection"""
+        if event.row_key:
+            self.selected_alias = self.storage.get(str(event.row_key.value))
+            if self.selected_alias:
+                # Update used count
+                self.selected_alias.used_count += 1
+                self.storage.save()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle search input changes"""
         if event.input.id == "search":
             self.search_term = event.value
             self.refresh_table(self.search_term)
-
-    def on_data_table_row_highlighted(self, event) -> None:
-        """Handle row selection"""
-        if event.row_key:
-            self.selected_alias = self.storage.get(str(event.row_key.value))
+            event.input.add_class("active") if event.value else event.input.remove_class("active")
 
     def action_focus_search(self) -> None:
         """Focus search input"""
         self.query_one("#search", Input).focus()
 
-    def action_clear_search(self) -> None:
-        """Clear search"""
-        self.query_one("#search", Input).value = ""
+    def action_clear(self) -> None:
+        """Clear search or close dialogs"""
+        search = self.query_one("#search", Input)
+        if search.value:
+            search.value = ""
+        self.refresh_table()
