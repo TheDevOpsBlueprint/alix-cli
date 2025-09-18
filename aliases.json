@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "exported_at": "2025-09-17T23:11:32.039875",
+  "count": 4,
+  "aliases": [
+    {
+      "name": "test-backup",
+      "command": "echo backup test",
+      "description": "asdasdasdasdas",
+      "tags": [],
+      "created_at": "2025-09-17T14:57:54.445324",
+      "used_count": 4,
+      "shell": null
+    },
+    {
+      "name": "alix-test",
+      "command": "echo 'alix works'",
+      "description": "testing",
+      "tags": [],
+      "created_at": "2025-09-17T15:02:44.908367",
+      "used_count": 7,
+      "shell": null
+    },
+    {
+      "name": "test111",
+      "command": "echo \"saying something\"",
+      "description": null,
+      "tags": [],
+      "created_at": "2025-09-17T15:56:52.019951",
+      "used_count": 0,
+      "shell": null
+    },
+    {
+      "name": "test",
+      "command": "echo test",
+      "description": null,
+      "tags": [],
+      "created_at": "2025-09-17T23:10:31.358820",
+      "used_count": 0,
+      "shell": null
+    }
+  ]
+}
