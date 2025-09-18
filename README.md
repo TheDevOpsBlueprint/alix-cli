@@ -1,26 +1,512 @@
-# alix-cli 🚀
+# alix - Interactive Alias Manager for Your Shell 🚀
 
-> Interactive alias manager for your shell - htop-style interface for your aliases!
+A powerful, htop-style terminal UI for managing shell aliases. Never forget a command again!
 
-## Features
+![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Shell](https://img.shields.io/badge/shell-bash%20|%20zsh%20|%20fish-lightgrey.svg)
 
-- 📋 Interactive TUI for browsing aliases
-- 🔍 Real-time search and filtering
-- ✏️ Add, edit, and delete aliases
-- 🔄 Sync with your shell config
-- 💾 Backup and restore
-- 🎨 Customizable themes
+## ✨ Features
 
-## Installation
+- **Interactive TUI**: Beautiful terminal interface inspired by htop
+- **Multi-Shell Support**: Works with bash, zsh, and fish
+- **Smart Search**: Real-time filtering and searching
+- **Auto-Backup**: Automatic backups before every change
+- **Import/Export**: Share alias collections with your team
+- **Shell Integration**: Apply aliases directly to your shell config
+- **Statistics**: Track usage and productivity gains
+- **Themes**: Multiple color themes (ocean, forest, monochrome)
+- **Safe Operations**: Confirmation prompts for destructive actions
+
+## 🚀 Quick Start
+
+### Installation
+
+#### macOS
+
 ```bash
-pip install alix-cli
+# Using Homebrew to install Python (if needed)
+brew install python@3.11
+
+# Clone the repository
+git clone https://github.com/TheDevOpsBlueprint/alix-cli.git
+cd alix-cli
+
+# Create virtual environment
+python3 -m venv alix-venv
+source alix-venv/bin/activate
+
+# Install alix
+pip install -e .
+
+# Run alix
+alix
 ```
 
-## Manual Setup
+#### Linux (Ubuntu/Debian)
+
+```bash
+# Install Python and dependencies
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+# Clone the repository
+git clone https://github.com/TheDevOpsBlueprint/alix-cli.git
+cd alix-cli
+
+# Create virtual environment
+python3 -m venv alix-venv
+source alix-venv/bin/activate
+
+# Install alix
+pip install -e .
+
+# Run alix
+alix
 ```
-git clone git@github.com:TheDevOpsBlueprint/alix-cli.git
+
+#### Linux (Fedora/RHEL/CentOS)
+
+```bash
+# Install Python and dependencies
+sudo dnf install python3 python3-pip
+
+# Clone the repository
+git clone https://github.com/TheDevOpsBlueprint/alix-cli.git
+cd alix-cli
+
+# Create virtual environment
+python3 -m venv alix-venv
+source alix-venv/bin/activate
+
+# Install alix
+pip install -e .
+
+# Run alix
+alix
+```
+
+#### Arch Linux
+
+```bash
+# Install Python and dependencies
+sudo pacman -S python python-pip
+
+# Clone and install (same as above)
+git clone https://github.com/TheDevOpsBlueprint/alix-cli.git
 cd alix-cli
 python3 -m venv alix-venv
 source alix-venv/bin/activate
-pip install -e ".[dev]"
+pip install -e .
+alix
 ```
+
+#### Using Make (Easiest)
+
+```bash
+# Clone the repository
+git clone https://github.com/TheDevOpsBlueprint/alix-cli.git
+cd alix-cli
+
+# Install with make
+make dev-install  # Creates venv and installs everything
+make run          # Run alix
+```
+
+## 📖 Usage Guide
+
+### Interactive Mode (Recommended)
+
+Launch the interactive TUI by simply running:
+
+```bash
+alix
+```
+
+#### TUI Keyboard Shortcuts
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `a` | Add | Add a new alias |
+| `e` | Edit | Edit selected alias |
+| `d` | Delete | Delete selected alias |
+| `/` | Search | Focus search box |
+| `ESC` | Clear | Clear search |
+| `j`/`↓` | Down | Navigate down |
+| `k`/`↑` | Up | Navigate up |
+| `r` | Refresh | Reload from disk |
+| `q` | Quit | Exit application |
+
+### CLI Commands
+
+#### Adding Aliases
+
+```bash
+# Interactive add
+alix add
+
+# Quick add with flags
+alix add -n "gs" -c "git status" -d "Git status shortcut"
+
+# Add complex commands
+alix add -n "gpl" -c "git pull origin $(git branch --show-current)" -d "Pull current branch"
+
+# Docker shortcuts
+alix add -n "dps" -c "docker ps -a" -d "List all containers"
+alix add -n "dex" -c "docker exec -it" -d "Docker exec interactive"
+```
+
+#### Listing Aliases
+
+```bash
+# List all aliases
+alix list
+
+# Beautiful table view
+alix ls
+```
+
+#### Remove Aliases
+
+```bash
+# Remove an alias
+alix remove <name>
+
+# Example
+alix remove gs
+```
+
+#### Apply to Shell
+
+Apply your aliases to your shell configuration:
+
+```bash
+# Detect and apply to current shell
+alix apply
+
+# Apply to specific config file
+alix apply --target ~/.zshrc
+
+# The command will:
+# 1. Backup your current config
+# 2. Add managed aliases section
+# 3. Make them available after restart
+```
+
+Then reload your shell:
+```bash
+# For bash
+source ~/.bashrc
+
+# For zsh
+source ~/.zshrc
+
+# For fish
+source ~/.config/fish/config.fish
+```
+
+#### Import/Export
+
+Share your alias collections:
+
+```bash
+# Export to JSON
+alix export --output my-aliases.json
+
+# Export to YAML
+alix export --output my-aliases.yaml --format yaml
+
+# Import aliases (merge with existing)
+alix import my-aliases.json --merge
+
+# Import without merging (skip duplicates)
+alix import team-aliases.json
+```
+
+#### Statistics
+
+View your alias usage statistics:
+
+```bash
+# Show statistics
+alix stats
+
+# Output example:
+# 📊 Alias Statistics
+# Total Aliases: 42
+# Characters Saved: ~1,337 keystrokes
+# Most Used: gs (156 times)
+# Average Command Length: 28.5 chars
+```
+
+#### Configuration
+
+Manage alix settings:
+
+```bash
+# Show current config
+alix config
+
+# Change theme
+alix config --theme ocean
+
+# Available themes:
+# - default (cyan/blue)
+# - ocean (blue tones)
+# - forest (green tones)
+# - monochrome (black & white)
+
+# Toggle settings
+alix config --auto-backup true
+alix config --confirm-delete false
+```
+
+## 🎨 Real-World Examples
+
+### DevOps Aliases
+
+```bash
+# Kubernetes shortcuts
+alix add -n "k" -c "kubectl" -d "Kubectl shortcut"
+alix add -n "kgp" -c "kubectl get pods" -d "Get pods"
+alix add -n "kgs" -c "kubectl get services" -d "Get services"
+alix add -n "kaf" -c "kubectl apply -f" -d "Apply file"
+alix add -n "kdel" -c "kubectl delete" -d "Delete resource"
+alix add -n "klog" -c "kubectl logs -f" -d "Follow logs"
+
+# Docker shortcuts
+alix add -n "dcu" -c "docker-compose up -d" -d "Compose up detached"
+alix add -n "dcd" -c "docker-compose down" -d "Compose down"
+alix add -n "dcl" -c "docker-compose logs -f" -d "Compose logs"
+alix add -n "dprune" -c "docker system prune -af" -d "Clean docker system"
+
+# Terraform shortcuts
+alix add -n "tf" -c "terraform" -d "Terraform shortcut"
+alix add -n "tfi" -c "terraform init" -d "Terraform init"
+alix add -n "tfp" -c "terraform plan" -d "Terraform plan"
+alix add -n "tfa" -c "terraform apply -auto-approve" -d "Terraform apply"
+```
+
+### Git Workflow
+
+```bash
+# Git shortcuts
+alix add -n "gs" -c "git status" -d "Git status"
+alix add -n "ga" -c "git add ." -d "Stage all changes"
+alix add -n "gc" -c "git commit -m" -d "Git commit"
+alix add -n "gp" -c "git push" -d "Git push"
+alix add -n "gpl" -c "git pull" -d "Git pull"
+alix add -n "gco" -c "git checkout" -d "Git checkout"
+alix add -n "gcb" -c "git checkout -b" -d "Create new branch"
+alix add -n "glog" -c "git log --oneline --graph --decorate" -d "Pretty git log"
+alix add -n "gdiff" -c "git diff --staged" -d "Show staged changes"
+```
+
+### System Administration
+
+```bash
+# System monitoring
+alix add -n "ports" -c "sudo lsof -i -P -n | grep LISTEN" -d "List listening ports"
+alix add -n "myip" -c "curl -s ifconfig.me" -d "Get public IP"
+alix add -n "diskspace" -c "df -h | grep -E '^/dev/'" -d "Check disk space"
+alix add -n "meminfo" -c "free -h" -d "Memory information"
+alix add -n "cpuinfo" -c "lscpu | grep -E 'Model name|Socket|Core'" -d "CPU information"
+
+# Network utilities
+alix add -n "flushdns" -c "sudo systemd-resolve --flush-caches" -d "Flush DNS cache"
+alix add -n "listening" -c "netstat -tuln" -d "Show listening ports"
+alix add -n "connections" -c "ss -tunap" -d "Show network connections"
+```
+
+## 📁 Data Storage
+
+Alix stores data in your home directory:
+
+```
+~/.alix/
+├── aliases.json       # Main alias storage
+├── config.json        # Configuration settings
+└── backups/          # Automatic backups
+    ├── aliases_20250117_103000.json
+    └── aliases_20250117_143000.json
+```
+
+### Alias Structure
+
+```json
+{
+  "gs": {
+    "name": "gs",
+    "command": "git status",
+    "description": "Git status shortcut",
+    "tags": ["git", "vcs"],
+    "created_at": "2025-01-17T10:30:00",
+    "used_count": 42,
+    "shell": "zsh"
+  }
+}
+```
+
+## 🔧 Advanced Configuration
+
+### Shell Integration
+
+Alix automatically detects your shell and modifies the appropriate config file:
+
+| Shell | Config Files (in priority order) |
+|-------|----------------------------------|
+| Bash | `.bash_aliases`, `.bashrc`, `.bash_profile` |
+| Zsh | `.zsh_aliases`, `.zshrc` |
+| Fish | `.config/fish/config.fish` |
+
+### Environment Variables
+
+```bash
+# Custom storage location (optional)
+export ALIX_HOME=/custom/path
+
+# Disable colored output
+export NO_COLOR=1
+```
+
+### Shell Aliases for Alix
+
+Add to your shell config for quick access:
+
+```bash
+# Quick shortcuts
+alias a='alix'
+alias aa='alix add'
+alias al='alix list'
+alias as='alix stats'
+```
+
+## 🧪 Development
+
+### Setting Up Development Environment
+
+```bash
+# Clone repository
+git clone https://github.com/TheDevOpsBlueprint/alix-cli.git
+cd alix-cli
+
+# Using make (recommended)
+make dev-install
+make test
+
+# Or manually
+python3 -m venv alix-venv
+source alix-venv/bin/activate
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/ -v
+```
+
+### Project Structure
+
+```
+alix-cli/
+├── alix/
+│   ├── __init__.py
+│   ├── cli.py              # CLI commands
+│   ├── tui.py              # Terminal UI
+│   ├── models.py           # Data models
+│   ├── storage.py          # Storage backend
+│   ├── config.py           # Configuration
+│   ├── shell_integrator.py # Shell integration
+│   ├── shell_detector.py   # Shell detection
+│   └── porter.py           # Import/export
+├── tests/
+│   ├── test_cli.py
+│   ├── test_models.py
+│   └── test_storage.py
+├── Makefile
+├── pyproject.toml
+├── CONTRIBUTING.md
+└── README.md
+```
+
+## 🤝 Contributing
+
+We follow strict PR guidelines for quality:
+
+1. **Fork** the repository
+2. **Create** feature branch (`git checkout -b feature/amazing-feature`)
+3. **Keep PRs small** - Maximum 80 lines per PR
+4. **Test** your changes
+5. **Submit** Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Issue: `alix: command not found`**
+```bash
+# Ensure virtual environment is activated
+source alix-venv/bin/activate
+
+# Or add to PATH
+export PATH="$HOME/alix-cli/alix-venv/bin:$PATH"
+```
+
+**Issue: Aliases not appearing in shell**
+```bash
+# After running 'alix apply', reload your shell
+source ~/.bashrc  # or ~/.zshrc
+
+# Check if aliases section exists
+grep "ALIX MANAGED" ~/.bashrc
+```
+
+**Issue: TUI colors not displaying correctly**
+```bash
+# Set proper terminal encoding
+export TERM=xterm-256color
+export LC_ALL=en_US.UTF-8
+```
+
+**Issue: Permission denied errors**
+```bash
+# Fix permissions
+chmod 755 ~/.alix
+chmod 644 ~/.alix/aliases.json
+```
+
+## 📊 Performance
+
+- **Instant startup**: < 50ms to launch TUI
+- **Efficient storage**: JSON format for fast read/write
+- **Smart backups**: Only keeps last 10 backups
+- **Lightweight**: ~200KB total footprint
+
+## 🛡️ Security
+
+- **No cloud sync**: All data stored locally
+- **Safe operations**: Automatic backups before changes
+- **Shell injection protection**: Commands are properly escaped
+- **Confirmation prompts**: For destructive operations
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+Built with:
+- [Click](https://click.palletsprojects.com/) - CLI framework
+- [Rich](https://rich.readthedocs.io/) - Beautiful terminal formatting
+- [Textual](https://textual.textualize.io/) - Terminal UI framework
+- [Python](https://python.org/) - Programming language
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/TheDevOpsBlueprint/alix-cli/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/TheDevOpsBlueprint/alix-cli/discussions)
+- **Email**: valentin.v.todorov@gmail.com
+
+---
+
+**Made with ❤️ by TheDevOpsBlueprint** | [⭐ Star us on GitHub](https://github.com/TheDevOpsBlueprint/alix-cli)
