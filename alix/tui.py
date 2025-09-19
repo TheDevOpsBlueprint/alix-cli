@@ -9,6 +9,7 @@ from alix import __version__
 from alix.storage import AliasStorage
 from alix.models import Alias
 from alix.config import Config
+from alix.shell_integrator import ShellIntegrator  # NEW IMPORT
 
 
 class AddAliasModal(ModalScreen[bool]):
@@ -107,6 +108,7 @@ class AddAliasModal(ModalScreen[bool]):
                 yield Button("Cancel", id="cancel")
                 yield Button("Create", id="create")
 
+    # MODIFIED METHOD: Added auto-apply functionality
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "create":
             name = self.query_one("#name", Input).value.strip()
@@ -117,9 +119,18 @@ class AddAliasModal(ModalScreen[bool]):
                 storage = AliasStorage()
                 alias = Alias(name=name, command=command, description=desc or None)
                 if storage.add(alias):
+                    # Auto-apply the alias
+                    integrator = ShellIntegrator()
+                    success, message = integrator.apply_single_alias(alias)
+
+                    if success:
+                        self.app.notify(f"Created and applied '{name}'", severity="information")
+                    else:
+                        self.app.notify(f"Created '{name}' (apply manually)", severity="warning")
+
                     self.dismiss(True)
                 else:
-                    self.notify(f"Alias '{name}' already exists", severity="error")
+                    self.app.notify(f"Alias '{name}' already exists", severity="error")
         else:
             self.dismiss(False)
 
@@ -224,6 +235,7 @@ class EditAliasModal(ModalScreen[bool]):
                 yield Button("Cancel", id="cancel")
                 yield Button("Update", id="update")
 
+    # MODIFIED METHOD: Added auto-apply for edits
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "update":
             name = self.query_one("#name", Input).value.strip()
@@ -244,6 +256,11 @@ class EditAliasModal(ModalScreen[bool]):
                 )
                 storage.aliases[name] = updated
                 storage.save()
+
+                # Auto-apply the updated alias
+                integrator = ShellIntegrator()
+                integrator.apply_single_alias(updated)
+
                 self.dismiss(True)
         else:
             self.dismiss(False)
@@ -446,12 +463,14 @@ class AliasManager(App):
     }
     """
 
+    # MODIFIED: Added 'p' binding for apply all
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True, priority=True),
         Binding("a", "add_alias", "Add", show=True),
         Binding("e", "edit_alias", "Edit", show=True),
         Binding("d", "delete_alias", "Delete", show=True),
         Binding("r", "refresh", "Refresh", show=True),
+        Binding("p", "apply_all", "Apply All", show=True),  # NEW BINDING
         Binding("/", "focus_search", "Search", show=True),
         Binding("escape", "clear_search", "Clear", show=False),
         Binding("j", "cursor_down", "Down", show=False),
@@ -479,11 +498,12 @@ class AliasManager(App):
 
             # Sidebar
             with Container(id="sidebar"):
-                # Action buttons
+                # Action buttons - MODIFIED to include Apply All button
                 with Container(id="action-buttons"):
                     yield Button("Add New", variant="success", id="btn-add")
                     yield Button("Edit", variant="warning", id="btn-edit")
                     yield Button("Delete", variant="error", id="btn-delete")
+                    yield Button("Apply All", variant="primary", id="btn-apply")  # NEW BUTTON
                     yield Button("Refresh", variant="default", id="btn-refresh")
 
                 # Info panel
@@ -536,9 +556,9 @@ class AliasManager(App):
         total = len(self.storage.list_all())
 
         if shown is not None:
-            status.update(f"Showing {shown} of {total} aliases")
+            status.update(f"Showing {shown} of {total} aliases | Press 'p' to apply all")
         else:
-            status.update(f"Total: {total} aliases")
+            status.update(f"Total: {total} aliases | Press 'p' to apply all")
 
     def update_info_panel(self, alias: Alias) -> None:
         info = self.query_one("#info-content", Static)
@@ -580,7 +600,7 @@ class AliasManager(App):
         def callback(success: bool):
             if success:
                 self.refresh_table()
-                self.notify("Alias added successfully")
+                self.notify("Alias added and applied successfully")
 
         self.push_screen(AddAliasModal(), callback)
 
@@ -589,7 +609,7 @@ class AliasManager(App):
             def callback(success: bool):
                 if success:
                     self.refresh_table()
-                    self.notify("Alias updated successfully")
+                    self.notify("Alias updated and applied successfully")
 
             self.push_screen(EditAliasModal(self.selected_alias), callback)
         else:
@@ -604,6 +624,9 @@ class AliasManager(App):
                         self.notify(f"Deleted '{self.selected_alias.name}'")
                         self.selected_alias = None
                         self.query_one("#info-content", Static).update("Select an alias")
+                        # Reapply all to remove deleted alias from shell
+                        integrator = ShellIntegrator()
+                        integrator.apply_aliases()
 
             self.push_screen(DeleteConfirmModal(self.selected_alias.name), callback)
         else:
@@ -630,6 +653,25 @@ class AliasManager(App):
         table = self.query_one("#table", DataTable)
         table.action_cursor_up()
 
+    # NEW METHOD: Apply all aliases to shell
+    def action_apply_all(self) -> None:
+        """Apply all aliases to shell configuration"""
+        integrator = ShellIntegrator()
+        target_file = integrator.get_target_file()
+
+        if not target_file:
+            self.notify("No shell config file found", severity="error")
+            return
+
+        success, message = integrator.apply_aliases(target_file)
+
+        if success:
+            self.notify(f"Applied all aliases to {target_file.name}", severity="success")
+            self.update_status()
+        else:
+            self.notify(f"Failed: {message}", severity="error")
+
+    # MODIFIED: Added btn-apply case
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-add":
             self.action_add_alias()
@@ -637,5 +679,7 @@ class AliasManager(App):
             self.action_edit_alias()
         elif event.button.id == "btn-delete":
             self.action_delete_alias()
+        elif event.button.id == "btn-apply":  # NEW CASE
+            self.action_apply_all()
         elif event.button.id == "btn-refresh":
             self.action_refresh()
