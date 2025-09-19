@@ -11,6 +11,7 @@ from alix import __version__
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
+from alix.shell_detector import ShellType  # NEW IMPORT
 from alix.scanner import AliasScanner
 from alix.porter import AliasPorter
 from alix.config import Config
@@ -34,7 +35,6 @@ def main(ctx):
         app.run()
 
 
-# MODIFIED COMMAND: add (with auto-apply functionality)
 @main.command()
 @click.option("--name", "-n", prompt=True, help="Alias name")
 @click.option("--command", "-c", prompt=True, help="Command to alias")
@@ -116,6 +116,55 @@ def scan(merge, source, file):
         console.print(f"  Skipped: {skipped_count} existing aliases")
 
     console.print("\n[dim]💡 Run 'alix apply' to add these to your shell config[/]")
+
+
+# NEW COMMAND: apply
+@main.command()
+@click.option("--shell", "-s", help="Target shell (auto-detect if not specified)")
+@click.option("--file", "-f", type=click.Path(), help="Custom config file path")
+@click.confirmation_option(prompt="Apply all aliases to shell config?")
+def apply(shell, file):
+    """Apply all aliases to your shell configuration"""
+    integrator = ShellIntegrator()
+
+    # Override shell type if specified
+    if shell:
+        try:
+            integrator.shell_type = ShellType(shell.lower())
+        except ValueError:
+            console.print(f"[red]Invalid shell type: {shell}[/]")
+            console.print("[dim]Valid options: bash, zsh, fish, sh[/]")
+            return
+
+    # Get target file
+    if file:
+        target_file = Path(file)
+        if not target_file.exists():
+            console.print(f"[red]File not found: {file}[/]")
+            return
+    else:
+        target_file = integrator.get_target_file()
+
+    if not target_file:
+        console.print("[red]No shell configuration file found![/]")
+        console.print("[dim]Try specifying a file with --file option[/]")
+        return
+
+    # Show what will be done
+    aliases = storage.list_all()
+    console.print(f"[cyan]Applying {len(aliases)} aliases to: {target_file}[/]")
+
+    # Apply aliases
+    success, message = integrator.apply_aliases(target_file)
+
+    if success:
+        console.print(f"[green]✓[/] {message}")
+        console.print("\n[bold]Next steps:[/]")
+        console.print(f"  1. Restart your terminal, OR")
+        console.print(f"  2. Run: [cyan]source {target_file}[/]")
+        console.print(f"\n[dim]Your aliases are now ready to use![/]")
+    else:
+        console.print(f"[red]✗[/] {message}")
 
 
 @main.command()
