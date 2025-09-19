@@ -11,6 +11,7 @@ from alix import __version__
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
+from alix.scanner import AliasScanner  # NEW IMPORT
 from alix.porter import AliasPorter
 from alix.config import Config
 
@@ -41,9 +42,65 @@ def add(name, command, description):
     """Add a new alias to your collection"""
     alias = Alias(name=name, command=command, description=description)
     if storage.add(alias):
-        console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
+        console.print(f"[green]✔[/] Added alias: [cyan]{name}[/] = '{command}'")
     else:
         console.print(f"[red]✗[/] Alias '{name}' already exists!")
+
+
+# NEW COMMAND: scan
+@main.command()
+@click.option("--merge/--replace", default=True, help="Merge with existing or replace")
+@click.option("--source", "-s", type=click.Choice(['system', 'active', 'file']),
+              default='system', help="Import source")
+@click.option("--file", "-f", type=click.Path(exists=True), help="File to import from")
+def scan(merge, source, file):
+    """Scan and import existing aliases from your system"""
+    scanner = AliasScanner()
+    imported_count = 0
+    skipped_count = 0
+
+    if source == 'file' and file:
+        # Import from specific file
+        filepath = Path(file)
+        aliases = scanner.scan_file(filepath)
+        console.print(f"[cyan]Found {len(aliases)} aliases in {filepath.name}[/]")
+    elif source == 'active':
+        # Import currently active aliases
+        aliases = scanner.get_active_aliases()
+        console.print(f"[cyan]Found {len(aliases)} active aliases[/]")
+    else:
+        # Import from all system files
+        results = scanner.scan_system()
+        aliases = []
+        for filename, file_aliases in results.items():
+            console.print(f"[dim]  {filename}: {len(file_aliases)} aliases[/]")
+            aliases.extend(file_aliases)
+        console.print(f"[cyan]Found {len(aliases)} total aliases in system files[/]")
+
+    if not aliases:
+        console.print("[yellow]No aliases found to import[/]")
+        return
+
+    # Import aliases
+    for alias in aliases:
+        if alias.name in storage.aliases:
+            if merge:
+                skipped_count += 1
+                continue
+            else:
+                storage.remove(alias.name)
+
+        if storage.add(alias):
+            imported_count += 1
+            console.print(f"[green]✓[/] Imported: [cyan]{alias.name}[/]")
+
+    # Summary
+    console.print("\n[bold green]Import Complete![/]")
+    console.print(f"  Imported: {imported_count} aliases")
+    if skipped_count > 0:
+        console.print(f"  Skipped: {skipped_count} existing aliases")
+
+    console.print("\n[dim]💡 Run 'alix apply' to add these to your shell config[/]")
 
 
 @main.command()
@@ -117,7 +174,7 @@ def about():
 🎨 Beautiful themes (press 't' in TUI)
 💾 Auto-backup before changes
 📤 Export/import alias collections
-🐚 Multi-shell support (bash, zsh, fish)
+🚀 Multi-shell support (bash, zsh, fish)
 
 ## Commands
 - `alix` - Launch interactive TUI
