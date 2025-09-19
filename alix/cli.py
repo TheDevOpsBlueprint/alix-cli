@@ -11,7 +11,7 @@ from alix import __version__
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
-from alix.scanner import AliasScanner  # NEW IMPORT
+from alix.scanner import AliasScanner
 from alix.porter import AliasPorter
 from alix.config import Config
 
@@ -34,20 +34,35 @@ def main(ctx):
         app.run()
 
 
+# MODIFIED COMMAND: add (with auto-apply functionality)
 @main.command()
 @click.option("--name", "-n", prompt=True, help="Alias name")
 @click.option("--command", "-c", prompt=True, help="Command to alias")
 @click.option("--description", "-d", help="Description of the alias")
-def add(name, command, description):
-    """Add a new alias to your collection"""
+@click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
+def add(name, command, description, no_apply):
+    """Add a new alias to your collection and apply it immediately"""
     alias = Alias(name=name, command=command, description=description)
+
     if storage.add(alias):
-        console.print(f"[green]✔[/] Added alias: [cyan]{name}[/] = '{command}'")
+        console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
+
+        # Auto-apply to shell unless disabled
+        if not no_apply:
+            integrator = ShellIntegrator()
+            success, message = integrator.apply_single_alias(alias)
+
+            if success:
+                console.print(f"[green]✓[/] {message}")
+                console.print(f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]")
+                console.print(f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]")
+            else:
+                console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
+                console.print(f"[dim]   Run 'alix apply' to apply all aliases to shell[/]")
     else:
         console.print(f"[red]✗[/] Alias '{name}' already exists!")
 
 
-# NEW COMMAND: scan
 @main.command()
 @click.option("--merge/--replace", default=True, help="Merge with existing or replace")
 @click.option("--source", "-s", type=click.Choice(['system', 'active', 'file']),
