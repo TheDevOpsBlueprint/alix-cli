@@ -404,7 +404,7 @@ class AliasManager(App):
     }
 
     DataTable > .datatable--cursor {
-        background: $secondary 30%;
+        background: $secondary 70%;
     }
 
     DataTable > .datatable--hover {
