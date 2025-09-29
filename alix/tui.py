@@ -10,7 +10,7 @@ from alix.storage import AliasStorage
 from alix.models import Alias
 from alix.config import Config
 from alix.shell_integrator import ShellIntegrator  # NEW IMPORT
-
+from alix.clipboard import ClipboardManager
 
 class AddAliasModal(ModalScreen[bool]):
     """Clean modal for adding aliases"""
@@ -404,7 +404,7 @@ class AliasManager(App):
     }
 
     DataTable > .datatable--cursor {
-        background: $secondary 30%;
+        background: $secondary 70%;
     }
 
     DataTable > .datatable--hover {
@@ -466,6 +466,7 @@ class AliasManager(App):
     # MODIFIED: Added 'p' binding for apply all
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True, priority=True),
+        Binding("c", "copy_alias", "Copy", show=True), #copy the alias command to clipboard
         Binding("a", "add_alias", "Add", show=True),
         Binding("e", "edit_alias", "Edit", show=True),
         Binding("d", "delete_alias", "Delete", show=True),
@@ -603,6 +604,19 @@ class AliasManager(App):
                 self.notify("Alias added and applied successfully")
 
         self.push_screen(AddAliasModal(), callback)
+
+    def action_copy_alias(self) -> None:
+        clipboard=ClipboardManager()
+        if self.selected_alias is None:
+            return
+
+        alias_cmd = self.selected_alias.command
+
+        try:
+            clipboard.copy(alias_cmd)
+            self.notify("Alias command copied to clipboard")
+        except:
+            self.notify(f"Unable to copy. Command: {alias_cmd}")
 
     def action_edit_alias(self) -> None:
         if self.selected_alias:
