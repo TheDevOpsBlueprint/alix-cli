@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from alix.shell_detector import ShellDetector, ShellType
 from alix.storage import AliasStorage
