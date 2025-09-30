@@ -67,7 +67,6 @@ def add(name, command, description, no_apply, force):
             text=True,
             timeout=5,
         )
-        print(cmd)
         if cmd.returncode == 0:
             command_exists = True
             msg = cmd.stdout
