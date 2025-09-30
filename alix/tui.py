@@ -1,6 +1,16 @@
+import subprocess
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical, Center, VerticalScroll
-from textual.widgets import Header, Footer, DataTable, Input, Button, Label, Static
+from textual.widgets import (
+    Header,
+    Footer,
+    DataTable,
+    Input,
+    Button,
+    Label,
+    Static,
+    Checkbox,
+)
 from textual.binding import Binding
 from textual.screen import Screen, ModalScreen
 from datetime import datetime
@@ -11,6 +21,7 @@ from alix.models import Alias
 from alix.config import Config
 from alix.shell_integrator import ShellIntegrator  # NEW IMPORT
 from alix.clipboard import ClipboardManager
+
 
 class AddAliasModal(ModalScreen[bool]):
     """Clean modal for adding aliases"""
@@ -94,7 +105,7 @@ class AddAliasModal(ModalScreen[bool]):
         with Container(id="modal-container"):
             yield Static("ADD NEW ALIAS", id="modal-header")
 
-            with Container(id="modal-body"):
+            with VerticalScroll(id="modal-body"):
                 yield Label("Name", classes="field-label")
                 yield Input(placeholder="Enter alias name", id="name")
 
@@ -103,6 +114,8 @@ class AddAliasModal(ModalScreen[bool]):
 
                 yield Label("Description", classes="field-label")
                 yield Input(placeholder="Optional description", id="description")
+
+                yield Checkbox("Force Override", id="force")
 
             with Horizontal(id="button-row"):
                 yield Button("Cancel", id="cancel")
@@ -114,23 +127,57 @@ class AddAliasModal(ModalScreen[bool]):
             name = self.query_one("#name", Input).value.strip()
             command = self.query_one("#command", Input).value.strip()
             desc = self.query_one("#description", Input).value.strip()
+            force = self.query_one("#force", Checkbox).value
 
             if name and command:
                 storage = AliasStorage()
-                alias = Alias(name=name, command=command, description=desc or None)
-                if storage.add(alias):
-                    # Auto-apply the alias
-                    integrator = ShellIntegrator()
-                    success, message = integrator.apply_single_alias(alias)
-
-                    if success:
-                        self.app.notify(f"Created and applied '{name}'", severity="information")
-                    else:
-                        self.app.notify(f"Created '{name}' (apply manually)", severity="warning")
-
-                    self.dismiss(True)
+                command_exists = False
+                msg = None
+                cmd = storage.get(name)
+                if cmd is not None:
+                    command_exists = True
+                    msg = f"Alias exists in alix\nEnable Force Override if you want to override this alias\n{cmd.name}={cmd.command}"
+                if not command_exists:
+                    cmd = subprocess.run(
+                        [
+                            "bash",
+                            "-i",
+                            "-c",
+                            f"(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot {name}",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if cmd.returncode == 0:
+                        command_exists = True
+                        msg = cmd.stdout
+                if command_exists and not force:
+                    self.app.notify(
+                        f"Alias/Command/Function already exists\nEnable Force Override if you want to override this alias\n{msg}",
+                        severity="error",
+                    )
                 else:
-                    self.app.notify(f"Alias '{name}' already exists", severity="error")
+                    alias = Alias(name=name, command=command, description=desc or None)
+                    if storage.add(alias):
+                        # Auto-apply the alias
+                        integrator = ShellIntegrator()
+                        success, message = integrator.apply_single_alias(alias)
+
+                        if success:
+                            self.app.notify(
+                                f"Created and applied '{name}'", severity="information"
+                            )
+                        else:
+                            self.app.notify(
+                                f"Created '{name}' (apply manually)", severity="warning"
+                            )
+
+                        self.dismiss(True)
+                    else:
+                        self.app.notify(
+                            f"Alias '{name}' already exists", severity="error"
+                        )
         else:
             self.dismiss(False)
 
@@ -229,7 +276,11 @@ class EditAliasModal(ModalScreen[bool]):
                 yield Input(value=self.alias.command, id="command")
 
                 yield Label("Description", classes="field-label")
-                yield Input(value=self.alias.description or "", placeholder="Optional description", id="description")
+                yield Input(
+                    value=self.alias.description or "",
+                    placeholder="Optional description",
+                    id="description",
+                )
 
             with Horizontal(id="button-row"):
                 yield Button("Cancel", id="cancel")
@@ -252,7 +303,7 @@ class EditAliasModal(ModalScreen[bool]):
                     command=command,
                     description=desc or None,
                     created_at=self.alias.created_at,
-                    used_count=self.alias.used_count
+                    used_count=self.alias.used_count,
                 )
                 storage.aliases[name] = updated
                 storage.save()
@@ -338,7 +389,9 @@ class DeleteConfirmModal(ModalScreen[bool]):
             yield Static("DELETE CONFIRMATION", id="modal-header")
 
             with Container(id="modal-body"):
-                yield Static(f"Delete alias '{self.alias_name}'?", classes="delete-text")
+                yield Static(
+                    f"Delete alias '{self.alias_name}'?", classes="delete-text"
+                )
                 yield Static("This action cannot be undone", classes="warning-text")
 
             with Horizontal(id="button-row"):
@@ -466,7 +519,9 @@ class AliasManager(App):
     # MODIFIED: Added 'p' binding for apply all
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True, priority=True),
-        Binding("c", "copy_alias", "Copy", show=True), #copy the alias command to clipboard
+        Binding(
+            "c", "copy_alias", "Copy", show=True
+        ),  # copy the alias command to clipboard
         Binding("a", "add_alias", "Add", show=True),
         Binding("e", "edit_alias", "Edit", show=True),
         Binding("d", "delete_alias", "Delete", show=True),
@@ -504,7 +559,9 @@ class AliasManager(App):
                     yield Button("Add New", variant="success", id="btn-add")
                     yield Button("Edit", variant="warning", id="btn-edit")
                     yield Button("Delete", variant="error", id="btn-delete")
-                    yield Button("Apply All", variant="primary", id="btn-apply")  # NEW BUTTON
+                    yield Button(
+                        "Apply All", variant="primary", id="btn-apply"
+                    )  # NEW BUTTON
                     yield Button("Refresh", variant="default", id="btn-refresh")
 
                 # Info panel
@@ -536,10 +593,11 @@ class AliasManager(App):
         if search_term:
             search_lower = search_term.lower()
             aliases = [
-                a for a in aliases
+                a
+                for a in aliases
                 if search_lower in a.name.lower()
-                   or search_lower in a.command.lower()
-                   or (a.description and search_lower in a.description.lower())
+                or search_lower in a.command.lower()
+                or (a.description and search_lower in a.description.lower())
             ]
 
         for alias in aliases:
@@ -547,7 +605,7 @@ class AliasManager(App):
                 f"[bold cyan]{alias.name}[/]",
                 alias.command,
                 alias.description or "[dim]—[/]",
-                key=alias.name
+                key=alias.name,
             )
 
         self.update_status(len(aliases))
@@ -557,7 +615,9 @@ class AliasManager(App):
         total = len(self.storage.list_all())
 
         if shown is not None:
-            status.update(f"Showing {shown} of {total} aliases | Press 'p' to apply all")
+            status.update(
+                f"Showing {shown} of {total} aliases | Press 'p' to apply all"
+            )
         else:
             status.update(f"Total: {total} aliases | Press 'p' to apply all")
 
@@ -565,6 +625,7 @@ class AliasManager(App):
         info = self.query_one("#info-content", Static)
         # Escape any markup characters in the alias data
         from rich.text import Text
+
         name = Text(alias.name or "")
         command = Text(alias.command or "")
         description = Text(alias.description or "None")
@@ -583,7 +644,7 @@ class AliasManager(App):
                 ("Used: ", "bold"),
                 f"{alias.used_count} times\n",
                 ("Created: ", "bold"),
-                f"{alias.created_at.strftime('%Y-%m-%d')}"
+                f"{alias.created_at.strftime('%Y-%m-%d')}",
             )
         )
 
@@ -606,7 +667,7 @@ class AliasManager(App):
         self.push_screen(AddAliasModal(), callback)
 
     def action_copy_alias(self) -> None:
-        clipboard=ClipboardManager()
+        clipboard = ClipboardManager()
         if self.selected_alias is None:
             return
 
@@ -620,6 +681,7 @@ class AliasManager(App):
 
     def action_edit_alias(self) -> None:
         if self.selected_alias:
+
             def callback(success: bool):
                 if success:
                     self.refresh_table()
@@ -631,13 +693,16 @@ class AliasManager(App):
 
     def action_delete_alias(self) -> None:
         if self.selected_alias:
+
             def callback(confirmed: bool):
                 if confirmed:
                     if self.storage.remove(self.selected_alias.name):
                         self.refresh_table()
                         self.notify(f"Deleted '{self.selected_alias.name}'")
                         self.selected_alias = None
-                        self.query_one("#info-content", Static).update("Select an alias")
+                        self.query_one("#info-content", Static).update(
+                            "Select an alias"
+                        )
                         # Reapply all to remove deleted alias from shell
                         integrator = ShellIntegrator()
                         integrator.apply_aliases()
@@ -680,7 +745,9 @@ class AliasManager(App):
         success, message = integrator.apply_aliases(target_file)
 
         if success:
-            self.notify(f"Applied all aliases to {target_file.name}", severity="success")
+            self.notify(
+                f"Applied all aliases to {target_file.name}", severity="success"
+            )
             self.update_status()
         else:
             self.notify(f"Failed: {message}", severity="error")
