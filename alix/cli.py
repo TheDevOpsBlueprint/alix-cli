@@ -53,7 +53,7 @@ def add(name, command, description, no_apply, force):
     cmd = storage.get(name)
     if cmd is not None:
         command_exists = True
-        msg = f"Alias exists in alix\n{cmd.name}={cmd.command}"
+        msg = f"[red]✗[/] Alias '{name}' already exists in alix!\nEdit the alias to override it"
 
     if not command_exists:
         cmd = subprocess.run(
@@ -101,7 +101,48 @@ def add(name, command, description, no_apply, force):
                     f"[dim]   Run 'alix apply' to apply all aliases to shell[/]"
                 )
     else:
-        console.print(f"[red]✗[/] Alias '{name}' already exists!")
+        console.print(
+            f"[red]✗[/] Alias '{name}' already exists in alix!\nEdit the alias to override it"
+        )
+
+
+@main.command()
+@click.option("--name", "-n", prompt=True, help="Alias name")
+@click.option("--command", "-c", prompt=True, help="Command to alias")
+@click.option("--description", "-d", help="Description of the alias")
+@click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
+def edit(name, command, description, no_apply):
+    """Add a new alias to your collection and apply it immediately"""
+    msg = None
+
+    alias = storage.get(name)
+    if alias is None:
+        console.print(f"[red]x[/]The alias '{name}' does not exist in alix yet")
+    else:
+        alias.command = command
+        if description:
+            alias.description = description
+        storage.remove(alias.name)
+        storage.add(alias)
+        console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
+
+        if not no_apply:
+            integrator = ShellIntegrator()
+            success, message = integrator.apply_single_alias(alias)
+
+            if success:
+                console.print(f"[green]✓[/] {message}")
+                console.print(
+                    f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]"
+                )
+                console.print(
+                    f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]"
+                )
+            else:
+                console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
+                console.print(
+                    f"[dim]   Run 'alix apply' to apply all aliases to shell[/]"
+                )
 
 
 @main.command()
