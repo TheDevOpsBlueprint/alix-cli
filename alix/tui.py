@@ -136,7 +136,7 @@ class AddAliasModal(ModalScreen[bool]):
                 cmd = storage.get(name)
                 if cmd is not None:
                     command_exists = True
-                    msg = f"Alias exists in alix\nEnable Force Override if you want to override this alias\n{cmd.name}={cmd.command}"
+                    msg = f"Alias '{name}' exists in alix\nEdit the alias to override"
                 if not command_exists:
                     cmd = subprocess.run(
                         [
@@ -151,10 +151,13 @@ class AddAliasModal(ModalScreen[bool]):
                     )
                     if cmd.returncode == 0:
                         command_exists = True
-                        msg = cmd.stdout
+                        msg = (
+                            "Alias/Command/Function already exists\nEnable Force Override if you want to override this alias\n"
+                            + cmd.stdout
+                        )
                 if command_exists and not force:
                     self.app.notify(
-                        f"Alias/Command/Function already exists\nEnable Force Override if you want to override this alias\n{msg}",
+                        msg,
                         severity="error",
                     )
                 else:
@@ -176,7 +179,8 @@ class AddAliasModal(ModalScreen[bool]):
                         self.dismiss(True)
                     else:
                         self.app.notify(
-                            f"Alias '{name}' already exists", severity="error"
+                            f"Alias '{name}' exists in alix\nEdit the alias to override",
+                            severity="error",
                         )
         else:
             self.dismiss(False)
