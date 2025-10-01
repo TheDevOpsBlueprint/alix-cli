@@ -349,6 +349,76 @@ class DeleteConfirmModal(ModalScreen[bool]):
         self.dismiss(event.button.id == "delete")
 
 
+class HelpModal(ModalScreen):
+    """A modal screen to display help information."""
+
+    CSS = """
+    HelpModal {
+        align: center middle;
+        background: $background 80%;
+    }
+
+    #help-container {
+        width: 70;
+        height: 25;
+        background: $surface;
+        border: thick $primary-lighten-2;
+    }
+
+    #help-header {
+        background: $primary;
+        padding: 1;
+        text-align: center;
+        text-style: bold;
+        color: $text;
+    }
+
+    #help-body {
+        padding: 1 2;
+    }
+
+    .help-category {
+        text-style: bold;
+        color: $secondary;
+        margin-top: 1;
+    }
+
+    .help-item {
+        margin-left: 2;
+    }
+    """
+
+    BINDINGS = [
+        Binding("escape", "close_help", "Close", show=True)
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Container(id="help-container"):
+            yield Static("KEYBOARD SHORTCUTS", id="help-header")
+            with VerticalScroll(id="help-body"):
+                yield Static("NAVIGATION", classes="help-category")
+                yield Static("j / ↓ - Move cursor down", classes="help-item")
+                yield Static("k / ↑ - Move cursor up", classes="help-item")
+                yield Static("/ - Focus search bar", classes="help-item")
+                yield Static("esc - Clear search / Close modal", classes="help-item")
+
+                yield Static("ALIAS ACTIONS", classes="help-category")
+                yield Static("a - Add new alias", classes="help-item")
+                yield Static("e - Edit selected alias", classes="help-item")
+                yield Static("d - Delete selected alias", classes="help-item")
+                yield Static("c - Copy alias command", classes="help-item")
+                yield Static("p - Apply all aliases to shell config", classes="help-item")
+
+                yield Static("APPLICATION", classes="help-category")
+                yield Static("r - Refresh alias list from disk", classes="help-item")
+                yield Static("? - Show this help overlay", classes="help-item")
+                yield Static("q - Quit the application", classes="help-item")
+
+    def action_close_help(self) -> None:
+        """Close the help modal."""
+        self.dismiss()
+
+
 class AliasManager(App):
     """Clean and modern alias manager"""
 
@@ -476,6 +546,7 @@ class AliasManager(App):
         Binding("escape", "clear_search", "Clear", show=False),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("?", "show_help", "Help", show=True),
     ]
 
     def __init__(self):
@@ -666,6 +737,10 @@ class AliasManager(App):
     def action_cursor_up(self) -> None:
         table = self.query_one("#table", DataTable)
         table.action_cursor_up()
+
+    def action_show_help(self) -> None:
+        """Show the help modal."""
+        self.push_screen(HelpModal())
 
     # NEW METHOD: Apply all aliases to shell
     def action_apply_all(self) -> None:
