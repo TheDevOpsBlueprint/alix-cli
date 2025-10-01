@@ -109,7 +109,7 @@ def add(name, command, description, no_apply, force):
 @main.command()
 @click.option("--name", "-n", prompt=True, help="Alias name")
 @click.option("--command", "-c", prompt=True, help="Command to alias")
-@click.option("--description", "-d", help="Description of the alias")
+@click.option("--description", "-d", prompt=True, help="Description of the alias")
 @click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
 def edit(name, command, description, no_apply):
     """Add a new alias to your collection and apply it immediately"""
@@ -119,7 +119,8 @@ def edit(name, command, description, no_apply):
     if alias is None:
         console.print(f"[red]x[/]The alias '{name}' does not exist in alix yet")
     else:
-        alias.command = command
+        if command:
+            alias.command = command
         if description:
             alias.description = description
         storage.remove(alias.name)
