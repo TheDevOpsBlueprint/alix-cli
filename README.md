@@ -5,6 +5,8 @@ A powerful, htop-style terminal UI for managing shell aliases. Never forget a co
 ![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Shell](https://img.shields.io/badge/shell-bash%20|%20zsh%20|%20fish-lightgrey.svg)
+![CI](https://github.com/YOUR_FORK_USERNAME/alix-cli/workflows/CI/badge.svg)
+
 
 ## ✨ Features
 
