@@ -53,7 +53,7 @@ class AliasStorage:
         """Load aliases from JSON file"""
         if self.storage_path.exists():
             try:
-                with open(self.storage_path, 'r') as f:
+                with open(self.storage_path, "r") as f:
                     data = json.load(f)
                     self.aliases = {
                         name: Alias.from_dict(alias_data)
@@ -61,7 +61,7 @@ class AliasStorage:
                     }
             except (json.JSONDecodeError, Exception):
                 # If file is corrupted, start fresh but backup old file
-                backup_path = self.storage_path.with_suffix('.corrupted')
+                backup_path = self.storage_path.with_suffix(".corrupted")
                 if self.storage_path.exists():
                     self.storage_path.rename(backup_path)
                 self.aliases = {}
@@ -71,12 +71,9 @@ class AliasStorage:
         # Ensure directory exists
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
 
-        data = {
-            name: alias.to_dict()
-            for name, alias in self.aliases.items()
-        }
+        data = {name: alias.to_dict() for name, alias in self.aliases.items()}
 
-        with open(self.storage_path, 'w') as f:
+        with open(self.storage_path, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
     def add(self, alias: Alias) -> bool:

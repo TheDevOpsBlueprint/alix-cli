@@ -23,7 +23,7 @@ class AliasPorter:
             "version": "1.0",
             "exported_at": datetime.now().isoformat(),
             "count": len(aliases),
-            "aliases": [alias.to_dict() for alias in aliases]
+            "aliases": [alias.to_dict() for alias in aliases],
         }
 
     def export_to_file(self, filepath: Path, format: str = "json") -> tuple[bool, str]:
@@ -32,10 +32,10 @@ class AliasPorter:
 
         try:
             if format == "yaml":
-                with open(filepath, 'w') as f:
+                with open(filepath, "w") as f:
                     yaml.dump(data, f, default_flow_style=False, sort_keys=False)
             else:  # json
-                with open(filepath, 'w') as f:
+                with open(filepath, "w") as f:
                     json.dump(data, f, indent=2, default=str)
 
             return True, f"Exported {data['count']} aliases to {filepath.name}"
@@ -48,8 +48,8 @@ class AliasPorter:
             return False, f"File not found: {filepath}"
 
         try:
-            with open(filepath, 'r') as f:
-                if filepath.suffix in ['.yaml', '.yml']:
+            with open(filepath, "r") as f:
+                if filepath.suffix in [".yaml", ".yml"]:
                     data = yaml.safe_load(f)
                 else:
                     data = json.load(f)

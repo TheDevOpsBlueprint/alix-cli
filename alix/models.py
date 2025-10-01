@@ -12,6 +12,7 @@ TEST_ALIAS_CMD = "echo 'alix test working!'"
 @dataclass
 class Alias:
     """Represents a shell alias"""
+
     name: str
     command: str
     description: Optional[str] = None
@@ -29,7 +30,7 @@ class Alias:
             "tags": self.tags,
             "created_at": self.created_at.isoformat(),
             "used_count": self.used_count,
-            "shell": self.shell
+            "shell": self.shell,
         }
 
     @classmethod

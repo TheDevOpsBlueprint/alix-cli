@@ -19,9 +19,9 @@ class Config:
             "border_color": "blue",
             "header_color": "bright_blue",  # Rich-compatible
             "selected_color": "cyan",
-            "search_color": "bright_cyan",   # Rich-compatible
+            "search_color": "bright_cyan",  # Rich-compatible
             "success_color": "green",
-            "error_color": "bright_red",     # Rich-compatible
+            "error_color": "bright_red",  # Rich-compatible
         },
         "forest": {
             "border_color": "green",
@@ -33,12 +33,12 @@ class Config:
         },
         "monochrome": {
             "border_color": "white",
-            "header_color": "bright_white",   # Rich-compatible
+            "header_color": "bright_white",  # Rich-compatible
             "selected_color": "white",
-            "search_color": "bright_white",    # Rich-compatible
+            "search_color": "bright_white",  # Rich-compatible
             "success_color": "white",
-            "error_color": "bright_white",     # Rich-compatible
-        }
+            "error_color": "bright_white",  # Rich-compatible
+        },
     }
 
     DEFAULT_CONFIG = {
@@ -58,7 +58,7 @@ class Config:
         """Load configuration from file"""
         if self.config_path.exists():
             try:
-                with open(self.config_path, 'r') as f:
+                with open(self.config_path, "r") as f:
                     user_config = json.load(f)
                     return {**self.DEFAULT_CONFIG, **user_config}
             except Exception:
@@ -68,7 +68,7 @@ class Config:
     def save(self) -> None:
         """Save configuration to file"""
         self.config_dir.mkdir(exist_ok=True)
-        with open(self.config_path, 'w') as f:
+        with open(self.config_path, "w") as f:
             json.dump(self.config, f, indent=2)
 
     def get(self, key: str, default: Any = None) -> Any:
