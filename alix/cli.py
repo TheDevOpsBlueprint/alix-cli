@@ -15,6 +15,7 @@ from alix.shell_detector import ShellType  # NEW IMPORT
 from alix.scanner import AliasScanner
 from alix.porter import AliasPorter
 from alix.config import Config
+from click.core import shell_complete as _click_shell_complete
 
 console = Console()
 storage = AliasStorage()
@@ -120,10 +121,58 @@ def scan(merge, source, file):
 
 # NEW COMMAND: apply
 @main.command()
+@click.argument("shell", required=False, type=click.Choice(["bash", "zsh", "fish"]))
+@click.option("--install", is_flag=True, help="Install completion for the detected or specified shell")
+def completion(shell, install):
+    """Generate or install shell completion scripts for bash, zsh, fish.
+
+    Examples:
+      alix completion bash
+      alix completion zsh --install
+      alix completion fish
+    """
+    prog_name = "alix"
+    ctx_args = {}
+
+    integrator = ShellIntegrator()
+    detected = integrator.shell_type
+
+    target_shell = shell or (detected.value if detected else None)
+    if not target_shell:
+        console.print("[red]Unable to determine shell. Specify one of: bash, zsh, fish[/]")
+        return
+
+    import io
+    from contextlib import redirect_stdout
+
+    instruction = f"{target_shell}_source"
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        _click_shell_complete(main, ctx_args, prog_name, "_ALIX_COMPLETE", instruction)
+    script = buf.getvalue().rstrip("\n")
+
+    if install:
+        try:
+            success, message = integrator.install_completions(script, ShellType(target_shell))
+        except ValueError:
+            console.print(f"[red]Invalid shell: {target_shell}[/]")
+            return
+        if success:
+            console.print(f"[green]✓[/] {message}")
+            console.print("[dim]Restart your terminal or source your shell config to enable completions.[/]")
+        else:
+            console.print(f"[red]✗[/] {message}")
+        return
+
+    click.echo(script)
+
+
+@main.command()
 @click.option("--shell", "-s", help="Target shell (auto-detect if not specified)")
 @click.option("--file", "-f", type=click.Path(), help="Custom config file path")
+@click.option("--install-completions", is_flag=True, help="Also install shell completions for this shell")
 @click.confirmation_option(prompt="Apply all aliases to shell config?")
-def apply(shell, file):
+def apply(shell, file, install_completions):
     """Apply all aliases to your shell configuration"""
     integrator = ShellIntegrator()
 
@@ -165,6 +214,21 @@ def apply(shell, file):
         console.print(f"\n[dim]Your aliases are now ready to use![/]")
     else:
         console.print(f"[red]✗[/] {message}")
+        return
+
+    if install_completions:
+        target_shell = (integrator.shell_type.value if not shell else shell.lower())
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _click_shell_complete(main, {}, "alix", "_ALIX_COMPLETE", f"{target_shell}_source")
+        script = buf.getvalue().rstrip("\n")
+        ok, msg = integrator.install_completions(script, ShellType(target_shell))
+        if ok:
+            console.print(f"[green]✓[/] {msg}")
+        else:
+            console.print(f"[yellow]⚠[/] {msg}")
 
 
 @main.command()
