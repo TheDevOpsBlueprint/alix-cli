@@ -2,8 +2,10 @@
 
 import os
 import sys
+import subprocess
+import pwd
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 from enum import Enum
 
 
@@ -32,36 +34,128 @@ class ShellDetector:
         self.home_dir = home_dir or Path.home()
 
     def detect_current_shell(self) -> ShellType:
-        """Detect the current shell from environment"""
-        # Try SHELL environment variable
+        """Detect the current shell from environment with improved macOS support"""
+        # Method 1: Try SHELL environment variable (most reliable when set)
         shell_env = os.environ.get("SHELL", "").lower()
+        if shell_env:
+            if "zsh" in shell_env:
+                return ShellType.ZSH
+            elif "bash" in shell_env:
+                return ShellType.BASH
+            elif "fish" in shell_env:
+                return ShellType.FISH
+            elif "sh" in shell_env and "bash" not in shell_env and "zsh" not in shell_env:
+                return ShellType.SH
 
-        if "zsh" in shell_env:
+        # Method 2: Check /etc/passwd for user's default shell (reliable fallback)
+        try:
+            user_shell = pwd.getpwuid(os.getuid()).pw_shell.lower()
+            if "zsh" in user_shell:
+                return ShellType.ZSH
+            elif "bash" in user_shell:
+                return ShellType.BASH
+            elif "fish" in user_shell:
+                return ShellType.FISH
+            elif user_shell.endswith("/sh"):
+                return ShellType.SH
+        except (ImportError, KeyError, AttributeError):
+            pass
+
+        # Method 3: macOS-specific detection using dscl (Directory Service Command Line)
+        if sys.platform == "darwin":
+            try:
+                result = subprocess.run(
+                    ["dscl", ".", "-read", f"/Users/{os.getenv('USER', '')}", "UserShell"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout:
+                    shell_path = result.stdout.split()[-1].lower()
+                    if "zsh" in shell_path:
+                        return ShellType.ZSH
+                    elif "bash" in shell_path:
+                        return ShellType.BASH
+                    elif "fish" in shell_path:
+                        return ShellType.FISH
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                pass
+
+        # Method 4: Check for shell-specific environment variables
+        if os.environ.get("ZSH_NAME") or os.environ.get("ZSH_VERSION"):
             return ShellType.ZSH
-        elif "bash" in shell_env:
+        elif os.environ.get("BASH_VERSION"):
             return ShellType.BASH
-        elif "fish" in shell_env:
-            return ShellType.FISH
-        elif "sh" in shell_env:
-            return ShellType.SH
 
-        # Try parent process (fallback for Windows)
+        # Method 5: Try parent process (fallback)
         if sys.platform == "win32":
             return ShellType.UNKNOWN
 
-        # Check parent process name on Unix
         try:
             import psutil
             parent = psutil.Process(os.getppid())
             parent_name = parent.name().lower()
 
-            for shell_type in ShellType:
-                if shell_type.value in parent_name:
-                    return shell_type
+            # More specific matching for shell processes
+            if parent_name in ["zsh", "-zsh"]:
+                return ShellType.ZSH
+            elif parent_name in ["bash", "-bash"]:
+                return ShellType.BASH
+            elif parent_name in ["fish", "-fish"]:
+                return ShellType.FISH
+            elif parent_name in ["sh", "-sh"]:
+                return ShellType.SH
         except (ImportError, Exception):
             pass
 
+        # Method 6: Check for existence of shell-specific config files as a hint
+        shell_hints = self._get_shell_hints_from_configs()
+        if shell_hints:
+            return shell_hints
+
+        # Method 7: macOS default detection (Big Sur 11.0+ defaults to zsh)
+        if sys.platform == "darwin":
+            try:
+                # Check macOS version
+                result = subprocess.run(
+                    ["sw_vers", "-productVersion"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    version = result.stdout.strip()
+                    # macOS 10.15+ (Catalina and later) defaults to zsh
+                    major, minor = map(int, version.split('.')[:2])
+                    if major >= 11 or (major == 10 and minor >= 15):
+                        return ShellType.ZSH
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, FileNotFoundError):
+                pass
+
         return ShellType.UNKNOWN
+
+    def _get_shell_hints_from_configs(self) -> Optional[ShellType]:
+        """Get shell type hints from existing configuration files"""
+        zsh_configs = [".zshrc", ".zshenv", ".zprofile"]
+        bash_configs = [".bashrc", ".bash_profile", ".bash_aliases"]
+        fish_configs = [".config/fish/config.fish"]
+
+        # Check for zsh configs
+        for config in zsh_configs:
+            if (self.home_dir / config).exists():
+                return ShellType.ZSH
+
+        # Check for bash configs
+        for config in bash_configs:
+            if (self.home_dir / config).exists():
+                return ShellType.BASH
+
+        # Check for fish configs
+        for config in fish_configs:
+            if (self.home_dir / config).exists():
+                return ShellType.FISH
+
+        return None
 
     def find_config_files(self, shell_type: Optional[ShellType] = None) -> Dict[str, Path]:
         """Find existing configuration files for shell"""
