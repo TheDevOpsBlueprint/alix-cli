@@ -755,10 +755,8 @@ class AliasManager(App):
             self.refresh_table()
             self.notify("Showing all aliases", severity="information")
         elif selected_group == "Ungrouped":
-            self.refresh_table_by_group(None)
             self.notify("Showing ungrouped aliases", severity="information")
         else:
-            self.refresh_table_by_group(selected_group)
             self.notify(f"Showing aliases in group: {selected_group}", severity="information")
         table = self.query_one("#table", DataTable)
         table.clear()

@@ -425,38 +425,6 @@ def delete(group_name, reassign):
         console.print(f"[green]✓[/] Removed group '{group_name}' from {len(group_aliases)} aliases")
 
 @group.command()
-@click.argument("group_name")
-@click.option("--apply", is_flag=True, help="Apply all aliases in group to shell")
-def apply(group_name, apply):
-    """Apply all aliases in a group to shell"""
-    aliases = storage.list_all()
-    group_aliases = [a for a in aliases if a.group == group_name]
-    
-    if not group_aliases:
-        console.print(f"[yellow]⚠[/] Group '{group_name}' not found or is empty")
-        return
-    
-    console.print(f"[cyan]Applying {len(group_aliases)} aliases from group '{group_name}'[/]")
-    
-    integrator = ShellIntegrator()
-    success_count = 0
-    
-    for alias in group_aliases:
-        success, message = integrator.apply_single_alias(alias)
-        if success:
-            success_count += 1
-            console.print(f"[green]✓[/] Applied: {alias.name}")
-        else:
-            console.print(f"[red]✗[/] Failed: {alias.name} - {message}")
-    
-    console.print(f"\n[bold]Summary:[/] {success_count}/{len(group_aliases)} aliases applied successfully")
-    
-    if success_count > 0:
-        target_file = integrator.get_target_file()
-        if target_file:
-            console.print(f"\n[dim]💡 Run 'source {target_file}' to activate in current session[/]")
-
-@group.command()
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--group", "-g", help="Import to specific group (overrides file group)")
 def import_group(file, group):
