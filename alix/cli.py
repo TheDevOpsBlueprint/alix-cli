@@ -1,4 +1,5 @@
 import click
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from rich.console import Console
@@ -32,6 +33,7 @@ def main(ctx):
     """
     if ctx.invoked_subcommand is None:
         from alix.tui import AliasManager
+
         app = AliasManager()
         app.run()
 
@@ -41,10 +43,43 @@ def main(ctx):
 @click.option("--command", "-c", prompt=True, help="Command to alias")
 @click.option("--description", "-d", help="Description of the alias")
 @click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
-def add(name, command, description, no_apply):
+@click.option(
+    "--force", is_flag=True, help="Force apply new alias over existing aliases/commands"
+)
+def add(name, command, description, no_apply, force):
     """Add a new alias to your collection and apply it immediately"""
-    alias = Alias(name=name, command=command, description=description)
+    msg = None
 
+    command_exists = False
+    cmd = storage.get(name)
+    if cmd is not None:
+        command_exists = True
+        msg = f"[red]✗[/] Alias '{name}' already exists in alix!\nEdit the alias to override it"
+
+    if not command_exists:
+        cmd = subprocess.run(
+            [
+                "bash",
+                "-i",
+                "-c",
+                f"(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot {name}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if cmd.returncode == 0:
+            command_exists = True
+            msg = cmd.stdout
+
+    if command_exists and not force:
+        console.print(
+            "[red]Alias/Command/Function already exists. Add --force flag to override"
+        )
+        console.print(msg)
+        exit()
+
+    alias = Alias(name=name, command=command, description=description)
     if storage.add(alias):
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
 
@@ -55,19 +90,72 @@ def add(name, command, description, no_apply):
 
             if success:
                 console.print(f"[green]✓[/] {message}")
-                console.print(f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]")
-                console.print(f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]")
+                console.print(
+                    f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]"
+                )
+                console.print(
+                    f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]"
+                )
             else:
                 console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
-                console.print(f"[dim]   Run 'alix apply' to apply all aliases to shell[/]")
+                console.print(
+                    f"[dim]   Run 'alix apply' to apply all aliases to shell[/]"
+                )
     else:
-        console.print(f"[red]✗[/] Alias '{name}' already exists!")
+        console.print(
+            f"[red]✗[/] Alias '{name}' already exists in alix!\nEdit the alias to override it"
+        )
+
+
+@main.command()
+@click.option("--name", "-n", prompt=True, help="Alias name")
+@click.option("--command", "-c", prompt=True, help="Command to alias")
+@click.option("--description", "-d", prompt=True, help="Description of the alias")
+@click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
+def edit(name, command, description, no_apply):
+    """Add a new alias to your collection and apply it immediately"""
+    msg = None
+
+    alias = storage.get(name)
+    if alias is None:
+        console.print(f"[red]x[/]The alias '{name}' does not exist in alix yet")
+    else:
+        if command:
+            alias.command = command
+        if description:
+            alias.description = description
+        storage.remove(alias.name)
+        storage.add(alias)
+        console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
+
+        if not no_apply:
+            integrator = ShellIntegrator()
+            success, message = integrator.apply_single_alias(alias)
+
+            if success:
+                console.print(f"[green]✓[/] {message}")
+                console.print(
+                    f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]"
+                )
+                console.print(
+                    f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]"
+                )
+            else:
+                console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
+                console.print(
+                    f"[dim]   Run 'alix apply' to apply all aliases to shell[/]"
+                )
 
 
 @main.command()
 @click.option("--merge/--replace", default=True, help="Merge with existing or replace")
-@click.option("--source", "-s", type=click.Choice(['system', 'active', 'file']),
-              default='system', help="Import source")
+@click.option(
+    "--source",
+    "-s",
+    type=click.Choice(["system", "active", "file"]),
+    default="system",
+    help="Import source",
+)
 @click.option("--file", "-f", type=click.Path(exists=True), help="File to import from")
 def scan(merge, source, file):
     """Scan and import existing aliases from your system"""
@@ -75,12 +163,12 @@ def scan(merge, source, file):
     imported_count = 0
     skipped_count = 0
 
-    if source == 'file' and file:
+    if source == "file" and file:
         # Import from specific file
         filepath = Path(file)
         aliases = scanner.scan_file(filepath)
         console.print(f"[cyan]Found {len(aliases)} aliases in {filepath.name}[/]")
-    elif source == 'active':
+    elif source == "active":
         # Import currently active aliases
         aliases = scanner.get_active_aliases()
         console.print(f"[cyan]Found {len(aliases)} active aliases[/]")
@@ -263,6 +351,10 @@ def stats(detailed, export):
     # Show top 5 space savers
     console.print(f"\n[bold]🏆 Top Commands by Length Saved:[/]")
     sorted_aliases = sorted(aliases, key=lambda a: len(a.command) - len(a.name), reverse=True)[:5]
+
+    sorted_aliases = sorted(
+        aliases, key=lambda a: len(a.command) - len(a.name), reverse=True
+    )[:5]
     table = Table(show_header=False, box=None, padding=(0, 2))
     for i, alias in enumerate(sorted_aliases, 1):
         saved = len(alias.command) - len(alias.name)
@@ -270,7 +362,11 @@ def stats(detailed, export):
             f"{i}.",
             f"[cyan]{alias.name}[/]",
             f"saves {saved} chars",
-            f"[dim]({alias.command[:30]}...)[/]" if len(alias.command) > 30 else f"[dim]({alias.command})[/]"
+            (
+                f"[dim]({alias.command[:30]}...)[/]"
+                if len(alias.command) > 30
+                else f"[dim]({alias.command})[/]"
+            ),
         )
     console.print(table)
     
@@ -451,8 +547,8 @@ def list_aliases():
 
     theme = config.get_theme()
     table = Table(title=f"📋 Your Aliases ({len(aliases)} total)")
-    table.add_column("Name", style=theme['header_color'], no_wrap=True)
-    table.add_column("Command", style=theme['success_color'])
+    table.add_column("Name", style=theme["header_color"], no_wrap=True)
+    table.add_column("Command", style=theme["success_color"])
 
     if config.get("show_descriptions", True):
         table.add_column("Description", style="dim")
