@@ -59,7 +59,7 @@ class Alias:
             "used_count": self.used_count,
             "shell": self.shell,
             "last_used": self.last_used.isoformat() if self.last_used else None,
-            "usage_history": [record.to_dict() for record in self.usage_history]
+            "usage_history": [record.to_dict() for record in self.usage_history],
             "group": self.group
 
         }
