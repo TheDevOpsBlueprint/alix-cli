@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict
-import json
+from typing import Optional, List, Dict, Any
 
 # Test alias constants for safe testing
 TEST_ALIAS_NAME = "alix-test-echo"
@@ -59,9 +58,8 @@ class Alias:
             "used_count": self.used_count,
             "shell": self.shell,
             "last_used": self.last_used.isoformat() if self.last_used else None,
-            "usage_history": [record.to_dict() for record in self.usage_history]
+            "usage_history": [record.to_dict() for record in self.usage_history],
             "group": self.group
-
         }
 
     @classmethod
@@ -87,7 +85,7 @@ class Alias:
         if len(self.usage_history) > 100:
             self.usage_history = self.usage_history[-100:]
     
-    def get_usage_stats(self) -> Dict[str, any]:
+    def get_usage_stats(self) -> Dict[str, Any]:
         """Get usage statistics for this alias"""
         if not self.usage_history:
             return {
