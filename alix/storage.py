@@ -147,3 +147,24 @@ class AliasStorage:
             "average_usage_per_alias": analytics.average_usage_per_alias,
             "most_productive_aliases": analytics.most_productive_aliases
         }
+      
+    def get_by_group(self, group_name: str) -> List[Alias]:
+        """Get all aliases in a specific group"""
+        return [alias for alias in self.aliases.values() if alias.group == group_name]
+
+    def get_groups(self) -> List[str]:
+        """Get all unique group names"""
+        groups = set()
+        for alias in self.aliases.values():
+            if alias.group:
+                groups.add(alias.group)
+        return sorted(list(groups))
+
+    def remove_group(self, group_name: str) -> int:
+        """Remove all aliases in a group, return count of removed aliases"""
+        count = 0
+        aliases_to_remove = [name for name, alias in self.aliases.items() if alias.group == group_name]
+        for name in aliases_to_remove:
+            if self.remove(name):
+                count += 1
+        return count

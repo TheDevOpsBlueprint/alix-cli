@@ -65,3 +65,11 @@ def porter_data() -> Dict[str, Any]:
             },
         ],
     }
+
+
+@pytest.fixture
+def shell_file_data() -> str:
+    return """
+    alias alix-test-echo='alix test working!'
+    """
+

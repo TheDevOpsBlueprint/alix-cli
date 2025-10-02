@@ -44,6 +44,7 @@ class Alias:
     shell: Optional[str] = None  # bash, zsh, fish, etc.
     last_used: Optional[datetime] = None
     usage_history: List[UsageRecord] = field(default_factory=list)
+    group: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert alias to dictionary for storage"""
@@ -57,6 +58,7 @@ class Alias:
             "shell": self.shell,
             "last_used": self.last_used.isoformat() if self.last_used else None,
             "usage_history": [record.to_dict() for record in self.usage_history]
+            "group": self.group
         }
 
     @classmethod
