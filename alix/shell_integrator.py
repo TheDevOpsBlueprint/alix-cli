@@ -6,6 +6,7 @@ from typing import Optional
 from alix.shell_detector import ShellDetector, ShellType
 from alix.storage import AliasStorage
 from alix.models import Alias, TEST_ALIAS_NAME
+from alix.parameters import ParameterParser
 
 class ShellIntegrator:
     """Apply aliases to shell configuration files"""
@@ -48,15 +49,49 @@ class ShellIntegrator:
         return backup_path
 
     def export_aliases(self, shell_type: ShellType) -> str:
-        """Export aliases in shell-specific format"""
+        """Export aliases in shell-specific format
+        
+        For aliases with parameters, generate shell functions instead of simple aliases.
+        """
         aliases = self.storage.list_all()
+        lines = []
 
-        if shell_type == ShellType.FISH:
-            lines = [f"alias {a.name}='{a.command}'" for a in aliases]
-        else:  # Bash, Zsh, Sh
-            lines = [f"alias {a.name}='{a.command}'" for a in aliases]
+        for alias in aliases:
+            if ParameterParser.has_parameters(alias.command):
+                # Generate a function for parameterized aliases
+                lines.append(self._generate_function(alias, shell_type))
+            else:
+                # Simple alias
+                if shell_type == ShellType.FISH:
+                    lines.append(f"alias {alias.name}='{alias.command}'")
+                else:  # Bash, Zsh, Sh
+                    lines.append(f"alias {alias.name}='{alias.command}'")
 
         return "\n".join(lines)
+    
+    def _generate_function(self, alias: Alias, shell_type: ShellType) -> str:
+        """Generate a shell function for parameterized aliases
+        
+        Args:
+            alias: The alias with parameters
+            shell_type: Target shell type
+            
+        Returns:
+            Shell function definition as a string
+        """
+        if shell_type == ShellType.FISH:
+            # Fish function syntax
+            lines = [
+                f"function {alias.name}",
+                f"    {alias.command}",
+                "end"
+            ]
+            return "\n".join(lines)
+        else:
+            # Bash/Zsh function syntax
+            # Escape single quotes in the command
+            escaped_command = alias.command.replace("'", "'\"'\"'")
+            return f"{alias.name}() {{ {alias.command}; }}"
 
     def preview_aliases(self, target_file: Optional[Path] = None) -> tuple[str, str]:
         """Get old and new config for dry-run"""        
@@ -140,12 +175,18 @@ class ShellIntegrator:
         start_idx = content.find(self.ALIX_MARKER_START)
         end_idx = content.find(self.ALIX_MARKER_END)
 
-        alias_line = f"alias {alias.name}='{alias.command}'"
+        # Generate appropriate definition (function or alias)
+        if ParameterParser.has_parameters(alias.command):
+            alias_line = self._generate_function(alias, self.shell_type)
+        else:
+            alias_line = f"alias {alias.name}='{alias.command}'"
 
         if start_idx != -1 and end_idx != -1:
             # Insert into existing alix section
             section_content = content[start_idx:end_idx]
-            if f"alias {alias.name}=" not in section_content:
+            # Check for both alias and function definitions
+            name_pattern = f"{alias.name}="
+            if name_pattern not in section_content and f"function {alias.name}" not in section_content and f"{alias.name}()" not in section_content:
                 # Add before the end marker
                 new_content = content[:end_idx] + f"{alias_line}\n" + content[end_idx:]
                 target_file.write_text(new_content)

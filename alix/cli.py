@@ -21,6 +21,7 @@ from alix.shell_wrapper import ShellWrapper
 import json  
 from datetime import datetime  
 from alix.render import Render
+from alix.parameters import ParameterParser
 
 console = Console()
 storage = AliasStorage()
@@ -52,8 +53,21 @@ def main(ctx):
     "--force", is_flag=True, help="Force apply new alias over existing aliases/commands"
 )
 def add(name, command, description, no_apply, force):
-    """Add a new alias to your collection and apply it immediately"""
+    """Add a new alias to your collection and apply it immediately
+    
+    Supports parameterized aliases using $1, $2, etc. for arguments.
+    
+    Examples:
+      alix add -n backup -c "cp $1 $1.bak" -d "Backup a file"
+      alix add -n gitc -c "git commit -m \\"$1\\"" -d "Quick git commit"
+    """
     msg = None
+
+    # Validate parameters in command
+    is_valid, error_msg = ParameterParser.validate_parameters(command)
+    if not is_valid:
+        console.print(f"[red]✗ Parameter validation error:[/] {error_msg}")
+        return
 
     command_exists = False
     cmd = storage.get(name)
@@ -84,9 +98,19 @@ def add(name, command, description, no_apply, force):
         console.print(msg)
         exit()
 
-    alias = Alias(name=name, command=command, description=description)
+    # Auto-detect parameter descriptions
+    parameters = ParameterParser.auto_detect_parameter_descriptions(command)
+    
+    alias = Alias(name=name, command=command, description=description, parameters=parameters)
     if storage.add(alias):
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
+        
+        # Show parameter info if present
+        if ParameterParser.has_parameters(command):
+            params = ParameterParser.extract_parameters(command)
+            console.print(f"[yellow]📋 Parameters detected:[/] {', '.join(params)}")
+            usage = alias.get_usage_example()
+            console.print(f"[dim]Usage:[/] {usage}")
 
         # Auto-apply to shell unless disabled
         if not no_apply:
@@ -95,9 +119,14 @@ def add(name, command, description, no_apply, force):
 
             if success:
                 console.print(f"[green]✓[/] {message}")
-                console.print(
-                    f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]"
-                )
+                if ParameterParser.has_parameters(command):
+                    console.print(
+                        f"[dim]💡 Alias '{name}' is now available as a function in new shell sessions[/]"
+                    )
+                else:
+                    console.print(
+                        f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]"
+                    )
                 console.print(
                     f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]"
                 )
@@ -627,14 +656,34 @@ def list_aliases():
     table = Table(title=f"📋 Your Aliases ({len(aliases)} total)")
     table.add_column("Name", style=theme["header_color"], no_wrap=True)
     table.add_column("Command", style=theme["success_color"])
+    table.add_column("Parameters", style="yellow", no_wrap=True)
 
     if config.get("show_descriptions", True):
         table.add_column("Description", style="dim")
         for alias in sorted(aliases, key=lambda a: a.name):
-            table.add_row(alias.name, alias.command, alias.description or "")
+            # Show parameter info
+            if ParameterParser.has_parameters(alias.command):
+                params = ParameterParser.extract_parameters(alias.command)
+                param_text = f"{len(params)} ({', '.join(params)})"
+            else:
+                param_text = "—"
+            
+            table.add_row(
+                alias.name, 
+                alias.command, 
+                param_text,
+                alias.description or ""
+            )
     else:
         for alias in sorted(aliases, key=lambda a: a.name):
-            table.add_row(alias.name, alias.command)
+            # Show parameter info
+            if ParameterParser.has_parameters(alias.command):
+                params = ParameterParser.extract_parameters(alias.command)
+                param_text = f"{len(params)} ({', '.join(params)})"
+            else:
+                param_text = "—"
+            
+            table.add_row(alias.name, alias.command, param_text)
 
     console.print(table)
     console.print(f"\n[dim]💡 Tip: Run 'alix' for interactive mode![/]")

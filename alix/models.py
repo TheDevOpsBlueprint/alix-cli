@@ -47,6 +47,7 @@ class Alias:
     last_used: Optional[datetime] = None
     usage_history: List[UsageRecord] = field(default_factory=list)
     group: Optional[str] = None
+    parameters: Dict[str, str] = field(default_factory=dict)  # e.g., {"$1": "filename", "$2": "destination"}
 
     def to_dict(self) -> dict:
         """Convert alias to dictionary for storage"""
@@ -59,9 +60,9 @@ class Alias:
             "used_count": self.used_count,
             "shell": self.shell,
             "last_used": self.last_used.isoformat() if self.last_used else None,
-            "usage_history": [record.to_dict() for record in self.usage_history]
-            "group": self.group
-
+            "usage_history": [record.to_dict() for record in self.usage_history],
+            "group": self.group,
+            "parameters": self.parameters
         }
 
     @classmethod
@@ -74,6 +75,9 @@ class Alias:
             data["last_used"] = datetime.fromisoformat(data["last_used"])
         if "usage_history" in data:
             data["usage_history"] = [UsageRecord.from_dict(record) for record in data["usage_history"]]
+        # Ensure parameters field exists for backward compatibility
+        if "parameters" not in data:
+            data["parameters"] = {}
         return cls(**data)
     
     def record_usage(self, context: Optional[str] = None) -> None:
@@ -112,6 +116,33 @@ class Alias:
             "usage_frequency": usage_frequency,
             "recent_usage": [record.to_dict() for record in recent_usage]
         }
+
+    def has_parameters(self) -> bool:
+        """Check if this alias uses parameters"""
+        import re
+        return bool(re.search(r'\$\d+|\$@|\$\*', self.command))
+    
+    def get_parameter_count(self) -> int:
+        """Get the number of parameters used in the command"""
+        import re
+        matches = re.findall(r'\$(\d+)', self.command)
+        return max([int(m) for m in matches], default=0)
+    
+    def get_usage_example(self) -> str:
+        """Generate a usage example with parameter hints"""
+        if not self.has_parameters():
+            return self.name
+        
+        param_hints = []
+        param_count = self.get_parameter_count()
+        for i in range(1, param_count + 1):
+            param_key = f"${i}"
+            if param_key in self.parameters:
+                param_hints.append(f"<{self.parameters[param_key]}>")
+            else:
+                param_hints.append(f"<arg{i}>")
+        
+        return f"{self.name} {' '.join(param_hints)}"
 
     def __str__(self) -> str:
         """String representation for display"""
