@@ -214,7 +214,7 @@ alix apply
 # Apply to specific config file
 alix apply --target ~/.zshrc
 
-# Apply with preview what can be changes
+# Apply with preview what can be changed
 alix apply --target ~/.zshrc --dry-run
 
 # The command will:
