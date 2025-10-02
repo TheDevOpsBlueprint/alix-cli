@@ -11,6 +11,7 @@ from enum import Enum
 
 class ShellType(Enum):
     """Supported shell types"""
+
     BASH = "bash"
     ZSH = "zsh"
     FISH = "fish"
@@ -44,7 +45,9 @@ class ShellDetector:
                 return ShellType.BASH
             elif "fish" in shell_env:
                 return ShellType.FISH
-            elif "sh" in shell_env and "bash" not in shell_env and "zsh" not in shell_env:
+            elif (
+                "sh" in shell_env and "bash" not in shell_env and "zsh" not in shell_env
+            ):
                 return ShellType.SH
 
         # Method 2: Check /etc/passwd for user's default shell (reliable fallback)
@@ -65,10 +68,16 @@ class ShellDetector:
         if sys.platform == "darwin":
             try:
                 result = subprocess.run(
-                    ["dscl", ".", "-read", f"/Users/{os.getenv('USER', '')}", "UserShell"],
+                    [
+                        "dscl",
+                        ".",
+                        "-read",
+                        f"/Users/{os.getenv('USER', '')}",
+                        "UserShell",
+                    ],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
                 if result.returncode == 0 and result.stdout:
                     shell_path = result.stdout.split()[-1].lower()
@@ -78,7 +87,11 @@ class ShellDetector:
                         return ShellType.BASH
                     elif "fish" in shell_path:
                         return ShellType.FISH
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+            except (
+                subprocess.TimeoutExpired,
+                subprocess.CalledProcessError,
+                FileNotFoundError,
+            ):
                 pass
 
         # Method 4: Check for shell-specific environment variables
@@ -93,6 +106,7 @@ class ShellDetector:
 
         try:
             import psutil
+
             parent = psutil.Process(os.getppid())
             parent_name = parent.name().lower()
 
@@ -121,15 +135,20 @@ class ShellDetector:
                     ["sw_vers", "-productVersion"],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
                 if result.returncode == 0:
                     version = result.stdout.strip()
                     # macOS 10.15+ (Catalina and later) defaults to zsh
-                    major, minor = map(int, version.split('.')[:2])
+                    major, minor = map(int, version.split(".")[:2])
                     if major >= 11 or (major == 10 and minor >= 15):
                         return ShellType.ZSH
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, FileNotFoundError):
+            except (
+                subprocess.TimeoutExpired,
+                subprocess.CalledProcessError,
+                ValueError,
+                FileNotFoundError,
+            ):
                 pass
 
         return ShellType.UNKNOWN
@@ -157,7 +176,9 @@ class ShellDetector:
 
         return None
 
-    def find_config_files(self, shell_type: Optional[ShellType] = None) -> Dict[str, Path]:
+    def find_config_files(
+        self, shell_type: Optional[ShellType] = None
+    ) -> Dict[str, Path]:
         """Find existing configuration files for shell"""
         if shell_type is None:
             shell_type = self.detect_current_shell()

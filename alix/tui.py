@@ -446,9 +446,7 @@ class HelpModal(ModalScreen):
     }
     """
 
-    BINDINGS = [
-        Binding("escape", "close_help", "Close", show=True)
-    ]
+    BINDINGS = [Binding("escape", "close_help", "Close", show=True)]
 
     def compose(self) -> ComposeResult:
         with Container(id="help-container"):
@@ -465,7 +463,9 @@ class HelpModal(ModalScreen):
                 yield Static("e - Edit selected alias", classes="help-item")
                 yield Static("d - Delete selected alias", classes="help-item")
                 yield Static("c - Copy alias command", classes="help-item")
-                yield Static("p - Apply all aliases to shell config", classes="help-item")
+                yield Static(
+                    "p - Apply all aliases to shell config", classes="help-item"
+                )
 
                 yield Static("APPLICATION", classes="help-category")
                 yield Static("r - Refresh alias list from disk", classes="help-item")
@@ -683,17 +683,27 @@ class AliasManager(App):
                 results = []
                 for alias in aliases:
                     # Search across name, command, and description
-                    name_score = fuzz.partial_ratio(search_term.lower(), alias.name.lower())
-                    cmd_score = fuzz.partial_ratio(search_term.lower(), alias.command.lower())
-                    desc_score = fuzz.partial_ratio(search_term.lower(), alias.description.lower()) if alias.description else 0
-                    
+                    name_score = fuzz.partial_ratio(
+                        search_term.lower(), alias.name.lower()
+                    )
+                    cmd_score = fuzz.partial_ratio(
+                        search_term.lower(), alias.command.lower()
+                    )
+                    desc_score = (
+                        fuzz.partial_ratio(
+                            search_term.lower(), alias.description.lower()
+                        )
+                        if alias.description
+                        else 0
+                    )
+
                     # Use the highest score
                     max_score = max(name_score, cmd_score, desc_score)
-                    
+
                     # Only include if score is above threshold (60%)
                     if max_score >= 60:
                         results.append((alias, max_score))
-                
+
                 # Sort by score (highest first)
                 results.sort(key=lambda x: x[1], reverse=True)
                 aliases = [alias for alias, score in results]
@@ -701,10 +711,11 @@ class AliasManager(App):
                 # Original exact substring search
                 search_lower = search_term.lower()
                 aliases = [
-                    a for a in aliases
+                    a
+                    for a in aliases
                     if search_lower in a.name.lower()
-                       or search_lower in a.command.lower()
-                       or (a.description and search_lower in a.description.lower())
+                    or search_lower in a.command.lower()
+                    or (a.description and search_lower in a.description.lower())
                 ]
 
         for alias in aliases:
@@ -720,14 +731,20 @@ class AliasManager(App):
     def update_status(self, shown: int = None) -> None:
         status = self.query_one("#status-bar", Static)
         total = len(self.storage.list_all())
-        
+
         # Add fuzzy search indicator
-        fuzzy_status = "[green]Fuzzy ON[/]" if self.fuzzy_search_enabled else "[dim]Fuzzy OFF[/]"
+        fuzzy_status = (
+            "[green]Fuzzy ON[/]" if self.fuzzy_search_enabled else "[dim]Fuzzy OFF[/]"
+        )
 
         if shown is not None:
-            status.update(f"Showing {shown} of {total} aliases | {fuzzy_status} | Press 'p' to apply all")
+            status.update(
+                f"Showing {shown} of {total} aliases | {fuzzy_status} | Press 'p' to apply all"
+            )
         else:
-            status.update(f"Total: {total} aliases | {fuzzy_status} | Press 'p' to apply all")
+            status.update(
+                f"Total: {total} aliases | {fuzzy_status} | Press 'p' to apply all"
+            )
 
     def update_info_panel(self, alias: Alias) -> None:
         info = self.query_one("#info-content", Static)
@@ -843,13 +860,14 @@ class AliasManager(App):
     def action_show_help(self) -> None:
         """Show the help modal."""
         self.push_screen(HelpModal())
+
     # NEW METHOD: Toggle fuzzy search
     def action_toggle_fuzzy(self) -> None:
         """Toggle fuzzy search on/off"""
         self.fuzzy_search_enabled = not self.fuzzy_search_enabled
         mode = "enabled" if self.fuzzy_search_enabled else "disabled"
         self.notify(f"Fuzzy search {mode}", severity="information")
-        
+
         # Re-run search with current search term
         search = self.query_one("#search", Input)
         self.refresh_table(search.value)

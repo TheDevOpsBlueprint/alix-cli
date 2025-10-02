@@ -34,7 +34,9 @@ class UsageRecord:
 
 @dataclass
 class Alias:
+
     """Represents a shell alias with usage tracking"""
+
     name: str
     command: str
     description: Optional[str] = None
@@ -59,6 +61,7 @@ class Alias:
             "last_used": self.last_used.isoformat() if self.last_used else None,
             "usage_history": [record.to_dict() for record in self.usage_history]
             "group": self.group
+
         }
 
     @classmethod

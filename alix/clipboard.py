@@ -8,7 +8,7 @@ except ImportError:
     pyperclip = None
 
 
-#Backend Interface
+# Backend Interface
 class ClipboardBackend(ABC):
     @abstractmethod
     def copy(self, text: str) -> bool:
@@ -16,7 +16,7 @@ class ClipboardBackend(ABC):
         ...
 
 
-#pyperclip backend
+# pyperclip backend
 class PyperclipBackend(ClipboardBackend):
     def copy(self, text: str) -> bool:
         if pyperclip is None:
@@ -28,7 +28,7 @@ class PyperclipBackend(ClipboardBackend):
             return False
 
 
-#macos backend
+# macos backend
 class MacOSBackend(ClipboardBackend):
     def copy(self, text: str) -> bool:
         if platform.system() != "Darwin":
@@ -41,7 +41,7 @@ class MacOSBackend(ClipboardBackend):
             return False
 
 
-#windows backend
+# windows backend
 class WindowsBackend(ClipboardBackend):
     def copy(self, text: str) -> bool:
         if platform.system() != "Windows":
@@ -54,14 +54,17 @@ class WindowsBackend(ClipboardBackend):
             return False
 
 
-#linux backend
+# linux backend
 class LinuxBackend(ClipboardBackend):
     def copy(self, text: str) -> bool:
         if platform.system() != "Linux":
             return False
         try:
             # Try xclip first, then xsel
-            for cmd in [["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]:
+            for cmd in [
+                ["xclip", "-selection", "clipboard"],
+                ["xsel", "--clipboard", "--input"],
+            ]:
                 try:
                     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
                     p.communicate(text.encode("utf-8"))
@@ -74,12 +77,13 @@ class LinuxBackend(ClipboardBackend):
             return False
 
 
-#fallback
+# fallback
 class FallbackBackend(ClipboardBackend):
     def copy(self, text: str) -> bool:
         return False
 
-#Clipboard Manager
+
+# Clipboard Manager
 class ClipboardManager:
     def __init__(self):
         self.backends = [
