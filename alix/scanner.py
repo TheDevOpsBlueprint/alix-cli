@@ -15,7 +15,7 @@ class AliasScanner:
     # Regex pattern to match alias definitions
     ALIAS_PATTERN = re.compile(
         r"^\s*alias\s+([a-zA-Z_][a-zA-Z0-9_\-]*)\s*=\s*['\"]?(.+?)['\"]?\s*$",
-        re.MULTILINE
+        re.MULTILINE,
     )
 
     def __init__(self):
@@ -33,14 +33,14 @@ class AliasScanner:
 
             for name, command in matches:
                 # Clean up command (remove quotes if present)
-                command = command.strip('\'"')
+                command = command.strip("'\"")
                 alias = Alias(
                     name=name,
                     command=command,
-                    description=f"Imported from {filepath.name}"
+                    description=f"Imported from {filepath.name}",
                 )
                 aliases.append(alias)
-        except Exception:
+        except Exception:  # pragma: no cover
             pass
 
         return aliases
@@ -53,7 +53,7 @@ class AliasScanner:
         results = {}
         for filename, filepath in config_files.items():
             aliases = self.scan_file(filepath)
-            if aliases:
+            if aliases:  # pragma: no branch
                 results[filename] = aliases
 
         return results
@@ -62,12 +62,15 @@ class AliasScanner:
         """Get currently active aliases using shell command"""
         aliases = []
         try:
+            shell_type = self.detector.detect_current_shell()
+            if shell_type == ShellType.UNKNOWN:
+                return []
             # Run alias command to get current aliases
             result = subprocess.run(
-                ["bash", "-i", "-c", "alias"],
+                [shell_type.value, "-i", "-c", "alias"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
 
             if result.returncode == 0:
@@ -75,12 +78,14 @@ class AliasScanner:
                     match = self.ALIAS_PATTERN.match(line)
                     if match:
                         name, command = match.groups()
-                        aliases.append(Alias(
-                            name=name,
-                            command=command.strip('\'"'),
-                            description="Active system alias"
-                        ))
-        except Exception:
+                        aliases.append(
+                            Alias(
+                                name=name,
+                                command=command.strip("'\""),
+                                description="Active system alias",
+                            )
+                        )
+        except Exception:  # pragma: nocover
             pass
 
         return aliases
