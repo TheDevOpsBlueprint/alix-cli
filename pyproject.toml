@@ -21,14 +21,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "flake8>=6.0.0",
+    "freezegun>=1.5.5",
 ]
 
 [project.scripts]
 alix = "alix.cli:main"
 
 [tool.pytest.ini_options]
-addopts = "--cov=alix --cov-branch"
+addopts = "--cov=alix --cov-branch --cov-report=term-missing"
