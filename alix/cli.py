@@ -16,7 +16,7 @@ from alix.shell_detector import ShellType
 from alix.scanner import AliasScanner
 from alix.porter import AliasPorter
 from alix.config import Config
-from click.core import shell_complete as _click_shell_complete
+from click import shell_completion as _click_shell_complete
 from alix.shell_wrapper import ShellWrapper
 import json  
 from datetime import datetime  
