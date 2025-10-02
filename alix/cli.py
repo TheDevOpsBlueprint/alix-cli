@@ -12,10 +12,14 @@ from alix import __version__
 from alix.models import Alias
 from alix.storage import AliasStorage
 from alix.shell_integrator import ShellIntegrator
-from alix.shell_detector import ShellType  # NEW IMPORT
+from alix.shell_detector import ShellType  
 from alix.scanner import AliasScanner
 from alix.porter import AliasPorter
 from alix.config import Config
+from click.core import shell_complete as _click_shell_complete
+from alix.shell_wrapper import ShellWrapper
+import json  
+from datetime import datetime  
 
 console = Console()
 storage = AliasStorage()
@@ -208,10 +212,58 @@ def scan(merge, source, file):
 
 # NEW COMMAND: apply
 @main.command()
+@click.argument("shell", required=False, type=click.Choice(["bash", "zsh", "fish"]))
+@click.option("--install", is_flag=True, help="Install completion for the detected or specified shell")
+def completion(shell, install):
+    """Generate or install shell completion scripts for bash, zsh, fish.
+
+    Examples:
+      alix completion bash
+      alix completion zsh --install
+      alix completion fish
+    """
+    prog_name = "alix"
+    ctx_args = {}
+
+    integrator = ShellIntegrator()
+    detected = integrator.shell_type
+
+    target_shell = shell or (detected.value if detected else None)
+    if not target_shell:
+        console.print("[red]Unable to determine shell. Specify one of: bash, zsh, fish[/]")
+        return
+
+    import io
+    from contextlib import redirect_stdout
+
+    instruction = f"{target_shell}_source"
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        _click_shell_complete(main, ctx_args, prog_name, "_ALIX_COMPLETE", instruction)
+    script = buf.getvalue().rstrip("\n")
+
+    if install:
+        try:
+            success, message = integrator.install_completions(script, ShellType(target_shell))
+        except ValueError:
+            console.print(f"[red]Invalid shell: {target_shell}[/]")
+            return
+        if success:
+            console.print(f"[green]✓[/] {message}")
+            console.print("[dim]Restart your terminal or source your shell config to enable completions.[/]")
+        else:
+            console.print(f"[red]✗[/] {message}")
+        return
+
+    click.echo(script)
+
+
+@main.command()
 @click.option("--shell", "-s", help="Target shell (auto-detect if not specified)")
 @click.option("--file", "-f", type=click.Path(), help="Custom config file path")
+@click.option("--install-completions", is_flag=True, help="Also install shell completions for this shell")
 @click.confirmation_option(prompt="Apply all aliases to shell config?")
-def apply(shell, file):
+def apply(shell, file, install_completions):
     """Apply all aliases to your shell configuration"""
     integrator = ShellIntegrator()
 
@@ -253,18 +305,38 @@ def apply(shell, file):
         console.print(f"\n[dim]Your aliases are now ready to use![/]")
     else:
         console.print(f"[red]✗[/] {message}")
+        return
+
+    if install_completions:
+        target_shell = (integrator.shell_type.value if not shell else shell.lower())
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _click_shell_complete(main, {}, "alix", "_ALIX_COMPLETE", f"{target_shell}_source")
+        script = buf.getvalue().rstrip("\n")
+        ok, msg = integrator.install_completions(script, ShellType(target_shell))
+        if ok:
+            console.print(f"[green]✓[/] {msg}")
+        else:
+            console.print(f"[yellow]⚠[/] {msg}")
 
 
 @main.command()
-def stats():
-    """Show statistics about your aliases"""
+@click.option("--detailed", "-d", is_flag=True, help="Show detailed usage analytics")
+@click.option("--export", "-e", type=click.Path(), help="Export analytics to file")
+def stats(detailed, export):
+    """Show comprehensive statistics and usage analytics about your aliases"""
     aliases = storage.list_all()
 
     if not aliases:
         console.print("[yellow]No aliases yet![/] Start with 'alix add'")
         return
 
-    # Calculate statistics
+    # Get usage analytics
+    analytics = storage.get_usage_analytics()
+    
+    # Basic statistics
     total = len(aliases)
     total_chars_saved = sum(len(a.command) - len(a.name) for a in aliases)
     avg_length = sum(len(a.command) for a in aliases) / total if total > 0 else 0
@@ -277,23 +349,75 @@ def stats():
         shell = alias.shell or "unspecified"
         shells[shell] = shells.get(shell, 0) + 1
 
-    # Create stats panel
+    # Create enhanced stats panel
     stats_text = f"""
-[bold cyan]📊 Alias Statistics[/]
+[bold cyan]📊 Alias Statistics & Analytics[/]
 
 [yellow]Total Aliases:[/] {total}
+[yellow]Total Uses:[/] {analytics['total_uses']:,}
 [yellow]Characters Saved:[/] ~{total_chars_saved:,} keystrokes
 [yellow]Average Command Length:[/] {avg_length:.1f} chars
-[yellow]Most Used:[/] {most_used.name if most_used else 'N/A'} ({most_used.used_count} times)
+[yellow]Average Usage per Alias:[/] {analytics['average_usage_per_alias']:.1f}
+[yellow]Most Used:[/] {analytics['most_used_alias'] or 'N/A'} ({most_used.used_count if most_used else 0} times)
 [yellow]Newest:[/] {newest.name if newest else 'N/A'}
+[yellow]Unused Aliases:[/] {len(analytics['unused_aliases'])}
+[yellow]Recently Used (7 days):[/] {len(analytics['recently_used'])}
 [yellow]Storage:[/] {storage.storage_path.name}
-[yellow]Backups:[/] {len(list(storage.backup_dir.glob('*.json')))} files
-
-[bold]Top Commands by Length Saved:[/]"""
+[yellow]Backups:[/] {len(list(storage.backup_dir.glob('*.json')))} files"""
 
     console.print(Panel.fit(stats_text, border_style="cyan"))
 
+    # Show detailed analytics if requested
+    if detailed:
+        console.print("\n[bold cyan]📈 Detailed Usage Analytics[/]")
+        
+        # Unused aliases
+        if analytics['unused_aliases']:
+            console.print(f"\n[yellow]⚠️  Unused Aliases ({len(analytics['unused_aliases'])}):[/]")
+            for alias_name in analytics['unused_aliases'][:10]:  # Show first 10
+                console.print(f"  • [dim]{alias_name}[/]")
+            if len(analytics['unused_aliases']) > 10:
+                console.print(f"  ... and {len(analytics['unused_aliases']) - 10} more")
+        
+        # Recently used aliases
+        if analytics['recently_used']:
+            console.print(f"\n[green]🔥 Recently Used (7 days):[/]")
+            for alias_name in analytics['recently_used'][:10]:  # Show first 10
+                alias = storage.get(alias_name)
+                if alias:
+                    console.print(f"  • [cyan]{alias_name}[/] - {alias.used_count} uses")
+        
+        # Most productive aliases
+        if analytics['most_productive_aliases']:
+            console.print(f"\n[bold]💪 Most Productive Aliases:[/]")
+            table = Table(show_header=True, header_style="bold cyan")
+            table.add_column("Rank", style="dim", width=6)
+            table.add_column("Alias", style="cyan")
+            table.add_column("Chars Saved", style="green")
+            table.add_column("Usage Count", style="yellow")
+            
+            for i, (alias_name, chars_saved) in enumerate(analytics['most_productive_aliases'][:10], 1):
+                alias = storage.get(alias_name)
+                usage_count = alias.used_count if alias else 0
+                table.add_row(
+                    f"{i}.",
+                    alias_name,
+                    str(chars_saved),
+                    str(usage_count)
+                )
+            console.print(table)
+        
+        # Usage trends (last 7 days)
+        if analytics['usage_trends']:
+            console.print(f"\n[bold]📅 Usage Trends (Last 7 Days):[/]")
+            recent_days = sorted(analytics['usage_trends'].items(), reverse=True)[:7]
+            for date, count in recent_days:
+                console.print(f"  {date}: {count} uses")
+
     # Show top 5 space savers
+    console.print(f"\n[bold]🏆 Top Commands by Length Saved:[/]")
+    sorted_aliases = sorted(aliases, key=lambda a: len(a.command) - len(a.name), reverse=True)[:5]
+
     sorted_aliases = sorted(
         aliases, key=lambda a: len(a.command) - len(a.name), reverse=True
     )[:5]
@@ -311,6 +435,132 @@ def stats():
             ),
         )
     console.print(table)
+    
+    # Export analytics if requested
+    if export:
+        output_path = Path(export)
+        storage.usage_tracker.export_analytics(output_path)
+        console.print(f"\n[green]✓[/] Analytics exported to: [cyan]{output_path}[/]")
+
+
+@main.command()
+@click.argument("alias_name")
+@click.option("--context", "-c", help="Additional context for this usage")
+def track(alias_name, context):
+    """Manually track usage of an alias"""
+    alias = storage.get(alias_name)
+    if not alias:
+        console.print(f"[red]✗[/] Alias '{alias_name}' not found!")
+        return
+    
+    storage.track_usage(alias_name, context)
+    console.print(f"[green]✓[/] Tracked usage of alias '{alias_name}'")
+    
+    # Show updated stats
+    alias = storage.get(alias_name)  # Get updated alias
+    console.print(f"[dim]Total uses: {alias.used_count}[/]")
+    if alias.last_used:
+        console.print(f"[dim]Last used: {alias.last_used.strftime('%Y-%m-%d %H:%M:%S')}[/]")
+
+
+@main.command()
+@click.option("--days", "-d", default=30, help="Number of days to show history for")
+@click.option("--alias", "-a", help="Show history for specific alias only")
+def history(days, alias):
+    """Show usage history and trends"""
+    if alias:
+        # Show history for specific alias
+        alias_obj = storage.get(alias)
+        if not alias_obj:
+            console.print(f"[red]✗[/] Alias '{alias}' not found!")
+            return
+        
+        console.print(f"[bold cyan]📈 Usage History for '{alias}'[/]")
+        console.print(f"Total uses: {alias_obj.used_count}")
+        if alias_obj.last_used:
+            console.print(f"Last used: {alias_obj.last_used.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Show recent usage history
+        history = storage.usage_tracker.get_alias_usage_history(alias, days)
+        if history:
+            console.print(f"\n[bold]Recent Usage ({days} days):[/]")
+            for record in history[-10:]:  # Show last 10 records
+                date = datetime.fromisoformat(record['date'])
+                console.print(f"  {date.strftime('%Y-%m-%d %H:%M')}")
+        else:
+            console.print("[dim]No usage history found[/]")
+    else:
+        # Show overall usage trends
+        analytics = storage.get_usage_analytics()
+        console.print(f"[bold cyan]📊 Overall Usage Trends ({days} days)[/]")
+        
+        if analytics['usage_trends']:
+            recent_days = sorted(analytics['usage_trends'].items(), reverse=True)[:days]
+            total_recent_usage = sum(count for _, count in recent_days)
+            console.print(f"Total usage in last {days} days: {total_recent_usage}")
+            
+            console.print(f"\n[bold]Daily Breakdown:[/]")
+            for date, count in recent_days:
+                console.print(f"  {date}: {count} uses")
+        else:
+            console.print("[dim]No usage data available[/]")
+
+
+@main.command()
+@click.option("--shell", "-s", help="Target shell (auto-detect if not specified)")
+@click.option("--file", "-f", type=click.Path(), help="Custom config file path")
+@click.option("--standalone", is_flag=True, help="Create standalone tracking script")
+@click.option("--output", "-o", type=click.Path(), help="Output path for standalone script")
+def setup_tracking(shell, file, standalone, output):
+    """Set up automatic usage tracking for aliases"""
+    wrapper = ShellWrapper()
+    
+    # Determine shell type
+    if shell:
+        try:
+            shell_type = ShellType(shell.lower())
+        except ValueError:
+            console.print(f"[red]Invalid shell type: {shell}[/]")
+            console.print("[dim]Valid options: bash, zsh, fish[/]")
+            return
+    else:
+        # Auto-detect shell
+        from alix.shell_detector import ShellDetector, ShellType
+        detector = ShellDetector()
+        shell_type = detector.detect_current_shell()
+        if not shell_type or shell_type == ShellType.UNKNOWN:
+            console.print("[red]Could not detect shell type. Please specify with --shell[/]")
+            return
+    
+    if standalone:
+        # Create standalone tracking script
+        if not output:
+            output = Path.home() / f".alix_tracking_{shell_type.value}.sh"
+        
+        success = wrapper.create_standalone_tracking_script(Path(output), shell_type.value)
+        if success:
+            console.print(f"[green]✓[/] Standalone tracking script created: [cyan]{output}[/]")
+            console.print(f"[dim]To use: source {output}[/]")
+        else:
+            console.print(f"[red]✗[/] Failed to create tracking script")
+    else:
+        # Install into shell config
+        if file:
+            config_file = Path(file)
+        else:
+            integrator = ShellIntegrator()
+            config_file = integrator.get_target_file()
+        
+        if not config_file or not config_file.exists():
+            console.print(f"[red]✗[/] Shell config file not found: {config_file}")
+            return
+        
+        success = wrapper.install_tracking_integration(config_file, shell_type.value)
+        if success:
+            console.print(f"[green]✓[/] Usage tracking installed in: [cyan]{config_file}[/]")
+            console.print(f"[dim]Restart your shell or run: source {config_file}[/]")
+        else:
+            console.print(f"[red]✗[/] Failed to install tracking integration")
 
 
 @main.command()
@@ -341,7 +591,10 @@ def about():
 - `alix remove` - Remove an alias
 - `alix apply` - Apply to shell config
 - `alix export/import` - Share collections
-- `alix stats` - View statistics
+- `alix stats` - View statistics with usage analytics
+- `alix track` - Manually track alias usage
+- `alix history` - Show usage history and trends
+- `alix setup-tracking` - Set up automatic usage tracking
 - `alix config` - Manage settings
 
 ## Learn More
@@ -374,6 +627,215 @@ def list_aliases():
     console.print(table)
     console.print(f"\n[dim]💡 Tip: Run 'alix' for interactive mode![/]")
 
+@main.group()
+def group():
+    """Manage alias groups"""
+    pass
+
+@group.command()
+@click.option("--name", "-n", prompt=True, help="Group name")
+def create(name):
+    """Create a new group (shows existing aliases that can be assigned)"""
+    aliases = storage.list_all()
+    ungrouped_aliases = [a for a in aliases if not a.group]
+    
+    if not ungrouped_aliases:
+        console.print(f"[yellow]No ungrouped aliases found to assign to group '{name}'[/]")
+        return
+    
+    console.print(f"[cyan]Creating group '{name}'[/]")
+    console.print(f"[dim]Found {len(ungrouped_aliases)} ungrouped aliases[/]")
+    
+    # Show ungrouped aliases
+    table = Table(title=f"Ungrouped Aliases")
+    table.add_column("Name", style="cyan")
+    table.add_column("Command", style="white")
+    table.add_column("Description", style="dim")
+    
+    for alias in ungrouped_aliases:
+        table.add_row(
+            alias.name,
+            alias.command[:50] + "..." if len(alias.command) > 50 else alias.command,
+            alias.description or "—"
+        )
+    
+    console.print(table)
+    console.print(f"\n[dim]💡 Use 'alix group add {name} <alias_name>' to add aliases to this group[/]")
+
+@group.command()
+def list():
+    """List all groups and their aliases"""
+    aliases = storage.list_all()
+    groups = {}
+    
+    # Group aliases by their group
+    for alias in aliases:
+        group_name = alias.group or "Ungrouped"
+        if group_name not in groups:
+            groups[group_name] = []
+        groups[group_name].append(alias)
+    
+    if not groups:
+        console.print("[yellow]No groups found[/]")
+        return
+    
+    for group_name, group_aliases in sorted(groups.items()):
+        console.print(f"\n[bold cyan]📁 {group_name}[/] ({len(group_aliases)} aliases)")
+        
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="cyan", width=20)
+        table.add_column("Command", style="white", width=40)
+        table.add_column("Description", style="dim", width=30)
+        
+        for alias in sorted(group_aliases, key=lambda a: a.name):
+            table.add_row(
+                alias.name,
+                alias.command[:40] + "..." if len(alias.command) > 40 else alias.command,
+                alias.description or "—"
+            )
+        
+        console.print(table)
+
+@group.command()
+@click.argument("group_name")
+@click.argument("alias_name")
+def add(group_name, alias_name):
+    """Add an alias to a group"""
+    alias = storage.get(alias_name)
+    if not alias:
+        console.print(f"[red]✗[/] Alias '{alias_name}' not found!")
+        return
+    
+    if alias.group == group_name:
+        console.print(f"[yellow]⚠[/] Alias '{alias_name}' is already in group '{group_name}'")
+        return
+    
+    # Update the alias with the new group
+    alias.group = group_name
+    storage.aliases[alias_name] = alias
+    storage.save()
+    
+    console.print(f"[green]✓[/] Added '{alias_name}' to group '{group_name}'")
+
+@group.command()
+@click.argument("group_name")
+@click.argument("alias_name")
+def remove(group_name, alias_name):
+    """Remove an alias from a group"""
+    alias = storage.get(alias_name)
+    if not alias:
+        console.print(f"[red]✗[/] Alias '{alias_name}' not found!")
+        return
+    
+    if alias.group != group_name:
+        console.print(f"[yellow]⚠[/] Alias '{alias_name}' is not in group '{group_name}'")
+        return
+    
+    # Remove the group from the alias
+    alias.group = None
+    storage.aliases[alias_name] = alias
+    storage.save()
+    
+    console.print(f"[green]✓[/] Removed '{alias_name}' from group '{group_name}'")
+
+@group.command()
+@click.argument("group_name")
+@click.option("--reassign", help="Reassign aliases to this group instead of deleting")
+@click.confirmation_option(prompt="Are you sure you want to delete this group?")
+def delete(group_name, reassign):
+    """Delete a group and optionally reassign aliases"""
+    aliases = storage.list_all()
+    group_aliases = [a for a in aliases if a.group == group_name]
+    
+    if not group_aliases:
+        console.print(f"[yellow]⚠[/] Group '{group_name}' not found or is empty")
+        return
+    
+    console.print(f"[cyan]Found {len(group_aliases)} aliases in group '{group_name}'[/]")
+    
+    if reassign:
+        # Reassign to another group
+        new_group = reassign
+        for alias in group_aliases:
+            alias.group = new_group
+            storage.aliases[alias.name] = alias
+        storage.save()
+        console.print(f"[green]✓[/] Reassigned {len(group_aliases)} aliases to group '{new_group}'")
+    else:
+        # Remove group from aliases (set to None)
+        for alias in group_aliases:
+            alias.group = None
+            storage.aliases[alias.name] = alias
+        storage.save()
+        console.print(f"[green]✓[/] Removed group '{group_name}' from {len(group_aliases)} aliases")
+
+@group.command()
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--group", "-g", help="Import to specific group (overrides file group)")
+def import_group(file, group):
+    """Import aliases from a group export file"""
+    try:
+        with open(file, 'r') as f:
+            data = json.load(f)
+        
+        if "aliases" not in data:
+            console.print(f"[red]✗[/] Invalid group export file")
+            return
+        
+        target_group = group or data.get("group", "imported")
+        imported_count = 0
+        skipped_count = 0
+        
+        for alias_name, alias_data in data["aliases"].items():
+            if alias_name in storage.aliases:
+                skipped_count += 1
+                continue
+            
+            alias = Alias.from_dict(alias_data)
+            alias.group = target_group
+            storage.aliases[alias_name] = alias
+            imported_count += 1
+        
+        storage.save()
+        
+        console.print(f"[green]✓[/] Imported {imported_count} aliases to group '{target_group}'")
+        if skipped_count > 0:
+            console.print(f"[yellow]⚠[/] Skipped {skipped_count} existing aliases")
+            
+    except Exception as e:
+        console.print(f"[red]✗[/] Failed to import: {e}")
+
+@group.command()
+@click.argument("group_name")
+@click.option("--apply", is_flag=True, help="Apply all aliases in group to shell")
+def apply(group_name, apply):
+    """Apply all aliases in a group to shell"""
+    aliases = storage.list_all()
+    group_aliases = [a for a in aliases if a.group == group_name]
+    
+    if not group_aliases:
+        console.print(f"[yellow]⚠[/] Group '{group_name}' not found or is empty")
+        return
+    
+    console.print(f"[cyan]Applying {len(group_aliases)} aliases from group '{group_name}'[/]")
+    
+    integrator = ShellIntegrator()
+    success_count = 0
+    
+    for alias in group_aliases:
+        success, message = integrator.apply_single_alias(alias)
+        if success:
+            success_count += 1
+            console.print(f"[green]✓[/] Applied: {alias.name}")
+        else:
+            console.print(f"[red]✗[/] Failed: {alias.name} - {message}")
+    
+    console.print(f"\n[bold]Summary:[/] {success_count}/{len(group_aliases)} aliases applied successfully")
+    
+    if success_count > 0:
+        target_file = integrator.get_target_file()
+        if target_file:
+            console.print(f"\n[dim]💡 Run 'source {target_file}' to activate in current session[/]")
 
 if __name__ == "__main__":
     main()

@@ -5,6 +5,7 @@ from typing import List, Optional, Dict
 from datetime import datetime
 
 from alix.models import Alias, TEST_ALIAS_NAME
+from alix.usage_tracker import UsageTracker
 
 
 class AliasStorage:
@@ -24,6 +25,7 @@ class AliasStorage:
         self.backup_dir.mkdir(exist_ok=True)
 
         self.aliases: Dict[str, Alias] = {}
+        self.usage_tracker = UsageTracker(self.storage_path.parent)
         self.load()
 
     def create_backup(self) -> Optional[Path]:
@@ -115,3 +117,52 @@ class AliasStorage:
             self.load()
             return True
         return False
+    
+    def track_usage(self, alias_name: str, context: Optional[str] = None) -> None:
+        """Track usage of an alias"""
+        if alias_name in self.aliases:
+            # Update the alias object
+            self.aliases[alias_name].record_usage(context)
+            self.save()
+            
+            # Update the usage tracker
+            self.usage_tracker.track_alias_usage(alias_name, context)
+    
+    def get_usage_analytics(self) -> Dict:
+        """Get comprehensive usage analytics"""
+        aliases = list(self.aliases.values())
+        analytics = self.usage_tracker.get_usage_analytics(aliases)
+        
+        return {
+            "total_aliases": analytics.total_aliases,
+            "total_uses": analytics.total_uses,
+            "most_used_alias": analytics.most_used_alias,
+            "least_used_alias": analytics.least_used_alias,
+            "unused_aliases": analytics.unused_aliases,
+            "recently_used": analytics.recently_used,
+            "usage_trends": analytics.usage_trends,
+            "average_usage_per_alias": analytics.average_usage_per_alias,
+            "most_productive_aliases": analytics.most_productive_aliases
+        }
+      
+    def get_by_group(self, group_name: str) -> List[Alias]:
+        """Get all aliases in a specific group"""
+        return [alias for alias in self.aliases.values() if alias.group == group_name]
+
+    def get_groups(self) -> List[str]:
+        """Get all unique group names"""
+        groups = set()
+        for alias in self.aliases.values():
+            if alias.group:
+                groups.add(alias.group)
+        return sorted(list(groups))
+
+    def remove_group(self, group_name: str) -> int:
+        """Remove all aliases in a group, return count of removed aliases"""
+        count = 0
+        aliases_to_remove = [name for name, alias in self.aliases.items() if alias.group == group_name]
+        for name in aliases_to_remove:
+            if self.remove(name):
+                count += 1
+        return count
+

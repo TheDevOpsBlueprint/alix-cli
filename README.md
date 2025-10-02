@@ -16,7 +16,10 @@ A powerful, htop-style terminal UI for managing shell aliases. Never forget a co
 - **Auto-Backup**: Automatic backups before every change
 - **Import/Export**: Share alias collections with your team
 - **Shell Integration**: Apply aliases directly to your shell config
-- **Statistics**: Track usage and productivity gains
+- **Usage Tracking & Analytics**: Track alias usage with detailed statistics
+- **Automatic Tracking**: Set up automatic usage tracking for all aliases
+- **Productivity Metrics**: See which aliases save you the most time
+- **Usage History**: View detailed usage patterns and trends
 - **Themes**: Multiple color themes (ocean, forest, monochrome)
 - **Safe Operations**: Confirmation prompts for destructive actions
 
@@ -178,6 +181,28 @@ alix remove <name>
 alix remove gs
 ```
 
+#### Usage Tracking Commands
+
+```bash
+# Track usage of an alias manually
+alix track my-alias --context "working on project"
+
+# View usage history and trends
+alix history
+
+# View history for specific alias
+alix history --alias my-alias --days 30
+
+# Set up automatic usage tracking
+alix setup-tracking
+
+# Create standalone tracking script
+alix setup-tracking --standalone --output ~/.alix_tracking.sh
+
+# Set up tracking for specific shell
+alix setup-tracking --shell zsh --file ~/.zshrc
+```
+
 #### Apply to Shell
 
 Apply your aliases to your shell configuration:
@@ -207,6 +232,31 @@ source ~/.zshrc
 source ~/.config/fish/config.fish
 ```
 
+#### Shell Tab Completion
+
+Enable command completions for `alix` (bash, zsh, fish):
+
+```bash
+# Preview / generate the script
+alix completion bash > ~/.config/alix/completions/alix.bash
+alix completion zsh  > ~/.config/alix/completions/alix.zsh
+alix completion fish > ~/.config/fish/completions/alix.fish
+
+# One-shot install for your current shell (auto-detects)
+alix completion --install
+
+# Or during apply
+alix apply --install-completions
+
+# Manual sourcing (bash/zsh) if needed
+echo 'source ~/.config/alix/completions/alix.bash' >> ~/.bashrc   # bash
+echo 'source ~/.config/alix/completions/alix.zsh'  >> ~/.zshrc    # zsh
+
+# Fish autoloads from ~/.config/fish/completions/
+```
+
+After installation, restart your terminal or source your shell config to enable completions.
+
 #### Import/Export
 
 Share your alias collections:
@@ -225,20 +275,71 @@ alix import my-aliases.json --merge
 alix import team-aliases.json
 ```
 
-#### Statistics
+#### Usage Tracking & Analytics
 
-View your alias usage statistics:
+Track your alias usage and productivity gains with comprehensive analytics:
 
 ```bash
-# Show statistics
+# View comprehensive statistics
 alix stats
 
-# Output example:
-# 📊 Alias Statistics
-# Total Aliases: 42
-# Characters Saved: ~1,337 keystrokes
-# Most Used: gs (156 times)
-# Average Command Length: 28.5 chars
+# View detailed analytics with usage patterns
+alix stats --detailed
+
+# Export analytics data for analysis
+alix stats --export analytics.json
+
+# Manually track usage of an alias
+alix track my-alias --context "working on project"
+
+# View usage history and trends
+alix history
+
+# View history for specific alias
+alix history --alias my-alias
+
+# Set up automatic usage tracking
+alix setup-tracking
+
+# Create standalone tracking script
+alix setup-tracking --standalone --output ~/.alix_tracking.sh
+```
+
+**Analytics Features:**
+- **Usage Frequency**: Track how often each alias is used
+- **Productivity Metrics**: See which aliases save the most keystrokes
+- **Usage Patterns**: View daily, weekly, and monthly usage trends
+- **Unused Aliases**: Identify aliases that are never used
+- **Recently Used**: See which aliases you've used recently
+- **Context Tracking**: Track usage context (working directory, etc.)
+- **Export/Import**: Share analytics data across systems
+
+**Example Output:**
+```
+📊 Alias Statistics & Analytics
+
+Total Aliases: 15
+Total Uses: 1,247
+Characters Saved: ~3,450 keystrokes
+Average Usage per Alias: 83.1
+Most Used: ll (156 times)
+Unused Aliases: 2
+Recently Used (7 days): 8
+
+📈 Detailed Usage Analytics
+
+⚠️  Unused Aliases (2):
+  • old-alias
+  • unused-command
+
+🔥 Recently Used (7 days):
+  • ll - 23 uses
+  • gst - 15 uses
+
+💪 Most Productive Aliases:
+  Rank  Alias  Chars Saved  Usage Count
+  1.     gst    saves 7     156
+  2.     ll     saves 4     89
 ```
 
 #### Configuration

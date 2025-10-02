@@ -658,6 +658,7 @@ class AliasManager(App):
         table.add_column("Name", width=15)
         table.add_column("Command", width=40)
         table.add_column("Description", width=30)
+        table.add_column("Group", width=15)
 
         self.refresh_table()
         self.update_status()
@@ -667,6 +668,14 @@ class AliasManager(App):
         table.clear()
 
         aliases = sorted(self.storage.list_all(), key=lambda a: a.name)
+
+        current_filter = getattr(self, '_current_group_filter', None)
+        if current_filter and current_filter not in ["All Groups"]:
+            if current_filter == "Ungrouped":
+                aliases = [a for a in aliases if not a.group]
+            else:
+                aliases = [a for a in aliases if a.group == current_filter]
+
 
         if search_term:
             if self.fuzzy_search_enabled:
@@ -896,3 +905,94 @@ class AliasManager(App):
             self.action_apply_all()
         elif event.button.id == "btn-refresh":
             self.action_refresh()
+    
+    def action_filter_by_group(self) -> None:
+        """Filter aliases by group"""
+        aliases = self.storage.list_all()
+        groups = set()
+        
+        # Collect all unique groups
+        for alias in aliases:
+            if alias.group:
+                groups.add(alias.group)
+        
+        if not groups:
+            self.notify("No groups found. Create some aliases with groups first.", severity="warning")
+            return
+        
+        # Create a simple group selection dialog
+        groups_list = sorted(list(groups))
+        groups_list.insert(0, "All Groups")  # Add option to show all
+        groups_list.append("Ungrouped")      # Add option to show ungrouped
+        
+        # For now, we'll use a simple approach - cycle through groups
+        # In a more advanced implementation, you could create a proper selection modal
+        current_filter = getattr(self, '_current_group_filter', None)
+        
+        if current_filter is None:
+            # Start with first group
+            selected_group = groups_list[0]
+        else:
+            # Find current group and move to next
+            try:
+                current_index = groups_list.index(current_filter)
+                next_index = (current_index + 1) % len(groups_list)
+                selected_group = groups_list[next_index]
+            except ValueError:
+                selected_group = groups_list[0]
+        
+        self._current_group_filter = selected_group
+        
+        # Apply the filter
+        if selected_group == "All Groups":
+            self.refresh_table()
+            self.notify("Showing all aliases", severity="information")
+        elif selected_group == "Ungrouped":
+            self.notify("Showing ungrouped aliases", severity="information")
+        else:
+            self.notify(f"Showing aliases in group: {selected_group}", severity="information")
+        table = self.query_one("#table", DataTable)
+        table.clear()
+
+        aliases = sorted(self.storage.list_all(), key=lambda a: a.name)
+
+        # Apply group filter if active
+        current_filter = getattr(self, '_current_group_filter', None)
+        if current_filter and current_filter not in ["All Groups"]:
+            if current_filter == "Ungrouped":
+                aliases = [a for a in aliases if not a.group]
+            else:
+                aliases = [a for a in aliases if a.group == current_filter]
+
+        if search_term:
+            search_lower = search_term.lower()
+            aliases = [
+                a for a in aliases
+                if search_lower in a.name.lower()
+                or search_lower in a.command.lower()
+                or (a.description and search_lower in a.description.lower())
+            ]
+
+        for alias in aliases:
+            table.add_row(
+                f"[bold cyan]{alias.name}[/]",
+                alias.command,
+                alias.description or "[dim]—[/]",
+                key=alias.name
+            )
+
+        self.update_status(len(aliases))
+
+    def update_status(self, shown: int = None) -> None:
+        status = self.query_one("#status-bar", Static)
+        total = len(self.storage.list_all())
+
+        current_filter = getattr(self, '_current_group_filter', None)
+        filter_text = ""
+        if current_filter and current_filter != "All Groups":
+            filter_text = f" | Filter: {current_filter}"
+
+        if shown is not None:
+            status.update(f"Showing {shown} of {total} aliases{filter_text} | Press 'g' to filter by group")
+        else:
+            status.update(f"Total: {total} aliases{filter_text} | Press 'g' to filter by group")
