@@ -20,10 +20,12 @@ from click.core import shell_complete as _click_shell_complete
 from alix.shell_wrapper import ShellWrapper
 import json  
 from datetime import datetime  
+from alix.render import Render
 
 console = Console()
 storage = AliasStorage()
 config = Config()
+render = Render()
 
 
 @click.group(invoke_without_command=True)
@@ -262,8 +264,8 @@ def completion(shell, install):
 @click.option("--shell", "-s", help="Target shell (auto-detect if not specified)")
 @click.option("--file", "-f", type=click.Path(), help="Custom config file path")
 @click.option("--install-completions", is_flag=True, help="Also install shell completions for this shell")
-@click.confirmation_option(prompt="Apply all aliases to shell config?")
-def apply(shell, file, install_completions):
+@click.option("--dry-run", is_flag=True, help="Allow users to preview what changes before applying")
+def apply(shell, file, install_completions, dry_run):
     """Apply all aliases to your shell configuration"""
     integrator = ShellIntegrator()
 
@@ -292,6 +294,16 @@ def apply(shell, file, install_completions):
 
     # Show what will be done
     aliases = storage.list_all()
+    
+    # Preview what will be changes
+    if dry_run:
+        old_config, new_config = integrator.preview_aliases(target_file)
+        render.side_by_side_diff(old_config, new_config)
+    
+    # Confirmation
+    if not click.confirm("Apply all aliases to shell config?"):
+        return
+        
     console.print(f"[cyan]Applying {len(aliases)} aliases to: {target_file}[/]")
 
     # Apply aliases

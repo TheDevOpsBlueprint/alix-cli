@@ -214,6 +214,9 @@ alix apply
 # Apply to specific config file
 alix apply --target ~/.zshrc
 
+# Apply with preview what can be changed
+alix apply --target ~/.zshrc --dry-run
+
 # The command will:
 # 1. Backup your current config
 # 2. Add managed aliases section
@@ -520,6 +523,7 @@ alix-cli/
 │   ├── shell_integrator.py # Shell integration
 │   ├── shell_detector.py   # Shell detection
 │   └── porter.py           # Import/export
+│   └── render.py           # CLI UI templates
 ├── tests/
 │   ├── test_cli.py
 │   ├── test_models.py
