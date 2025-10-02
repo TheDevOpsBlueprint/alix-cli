@@ -232,6 +232,31 @@ source ~/.zshrc
 source ~/.config/fish/config.fish
 ```
 
+#### Shell Tab Completion
+
+Enable command completions for `alix` (bash, zsh, fish):
+
+```bash
+# Preview / generate the script
+alix completion bash > ~/.config/alix/completions/alix.bash
+alix completion zsh  > ~/.config/alix/completions/alix.zsh
+alix completion fish > ~/.config/fish/completions/alix.fish
+
+# One-shot install for your current shell (auto-detects)
+alix completion --install
+
+# Or during apply
+alix apply --install-completions
+
+# Manual sourcing (bash/zsh) if needed
+echo 'source ~/.config/alix/completions/alix.bash' >> ~/.bashrc   # bash
+echo 'source ~/.config/alix/completions/alix.zsh'  >> ~/.zshrc    # zsh
+
+# Fish autoloads from ~/.config/fish/completions/
+```
+
+After installation, restart your terminal or source your shell config to enable completions.
+
 #### Import/Export
 
 Share your alias collections:
