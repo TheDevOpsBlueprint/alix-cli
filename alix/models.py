@@ -19,6 +19,7 @@ class Alias:
     created_at: datetime = field(default_factory=datetime.now)
     used_count: int = 0
     shell: Optional[str] = None  # bash, zsh, fish, etc.
+    group: Optional[str] = None 
 
     def to_dict(self) -> dict:
         """Convert alias to dictionary for storage"""
@@ -29,7 +30,8 @@ class Alias:
             "tags": self.tags,
             "created_at": self.created_at.isoformat(),
             "used_count": self.used_count,
-            "shell": self.shell
+            "shell": self.shell,
+            "group": self.group
         }
 
     @classmethod
