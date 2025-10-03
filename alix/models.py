@@ -63,6 +63,7 @@ class Alias:
             "usage_history": [record.to_dict() for record in self.usage_history],
             "group": self.group,
             "parameters": self.parameters
+
         }
 
     @classmethod
