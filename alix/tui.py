@@ -22,6 +22,7 @@ from alix.models import Alias
 from alix.config import Config
 from alix.shell_integrator import ShellIntegrator  # NEW IMPORT
 from alix.clipboard import ClipboardManager
+from alix.parameters import ParameterParser
 
 
 class AddAliasModal(ModalScreen[bool]):
@@ -122,7 +123,7 @@ class AddAliasModal(ModalScreen[bool]):
                 yield Button("Cancel", id="cancel")
                 yield Button("Create", id="create")
 
-    # MODIFIED METHOD: Added auto-apply functionality
+    # MODIFIED METHOD: Added auto-apply functionality and parameter validation
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "create":
             name = self.query_one("#name", Input).value.strip()
@@ -131,6 +132,15 @@ class AddAliasModal(ModalScreen[bool]):
             force = self.query_one("#force", Checkbox).value
 
             if name and command:
+                # Validate parameters
+                is_valid, error_msg = ParameterParser.validate_parameters(command)
+                if not is_valid:
+                    self.app.notify(
+                        f"Parameter validation error: {error_msg}",
+                        severity="error",
+                    )
+                    return
+                
                 storage = AliasStorage()
                 command_exists = False
                 msg = None
@@ -162,16 +172,23 @@ class AddAliasModal(ModalScreen[bool]):
                         severity="error",
                     )
                 else:
-                    alias = Alias(name=name, command=command, description=desc or None)
+                    # Auto-detect parameter descriptions
+                    parameters = ParameterParser.auto_detect_parameter_descriptions(command)
+                    
+                    alias = Alias(name=name, command=command, description=desc or None, parameters=parameters)
                     if storage.add(alias):
                         # Auto-apply the alias
                         integrator = ShellIntegrator()
                         success, message = integrator.apply_single_alias(alias)
 
+                        # Show parameter info in notification
+                        notify_msg = f"Created and applied '{name}'"
+                        if ParameterParser.has_parameters(command):
+                            param_count = len(ParameterParser.extract_parameters(command))
+                            notify_msg += f" ({param_count} params)"
+                        
                         if success:
-                            self.app.notify(
-                                f"Created and applied '{name}'", severity="information"
-                            )
+                            self.app.notify(notify_msg, severity="information")
                         else:
                             self.app.notify(
                                 f"Created '{name}' (apply manually)", severity="warning"
@@ -719,8 +736,14 @@ class AliasManager(App):
                 ]
 
         for alias in aliases:
+            # Add parameter badge if alias has parameters
+            name_display = f"[bold cyan]{alias.name}[/]"
+            if ParameterParser.has_parameters(alias.command):
+                param_count = ParameterParser.extract_parameters(alias.command)
+                name_display = f"[bold cyan]{alias.name}[/] [yellow]({len(param_count)} params)[/]"
+            
             table.add_row(
-                f"[bold cyan]{alias.name}[/]",
+                name_display,
                 alias.command,
                 alias.description or "[dim]—[/]",
                 key=alias.name,
@@ -755,23 +778,55 @@ class AliasManager(App):
         command = Text(alias.command or "")
         description = Text(alias.description or "None")
 
-        info.update(
-            Text.assemble(
-                ("Name: ", "bold"),
-                name,
+        # Build the info text
+        parts = [
+            ("Name: ", "bold"),
+            name,
+            "\n",
+            ("Command: ", "bold"),
+            command,
+            "\n",
+            ("Description: ", "bold"),
+            description,
+            "\n",
+        ]
+        
+        # Add parameter information if present
+        if ParameterParser.has_parameters(alias.command):
+            params = ParameterParser.extract_parameters(alias.command)
+            parts.extend([
+                ("Parameters: ", "bold green"),
+                f"{len(params)} ",
+                ("(", "dim"),
+            ])
+            
+            # Show parameter hints
+            param_hints = []
+            for param in params:
+                if param in alias.parameters:
+                    param_hints.append(f"{param}={alias.parameters[param]}")
+                else:
+                    param_hints.append(param)
+            parts.append((", ".join(param_hints), "cyan"))
+            parts.append((")", "dim"))
+            parts.append("\n")
+            
+            # Show usage example
+            usage = alias.get_usage_example()
+            parts.extend([
+                ("Usage: ", "bold"),
+                (usage, "yellow"),
                 "\n",
-                ("Command: ", "bold"),
-                command,
-                "\n",
-                ("Description: ", "bold"),
-                description,
-                "\n",
-                ("Used: ", "bold"),
-                f"{alias.used_count} times\n",
-                ("Created: ", "bold"),
-                f"{alias.created_at.strftime('%Y-%m-%d')}",
-            )
-        )
+            ])
+        
+        parts.extend([
+            ("Used: ", "bold"),
+            f"{alias.used_count} times\n",
+            ("Created: ", "bold"),
+            f"{alias.created_at.strftime('%Y-%m-%d')}",
+        ])
+
+        info.update(Text.assemble(*parts))
 
     def on_data_table_row_highlighted(self, event) -> None:
         if event.row_key:
@@ -945,43 +1000,14 @@ class AliasManager(App):
         
         # Apply the filter
         if selected_group == "All Groups":
-            self.refresh_table()
             self.notify("Showing all aliases", severity="information")
         elif selected_group == "Ungrouped":
             self.notify("Showing ungrouped aliases", severity="information")
         else:
             self.notify(f"Showing aliases in group: {selected_group}", severity="information")
-        table = self.query_one("#table", DataTable)
-        table.clear()
-
-        aliases = sorted(self.storage.list_all(), key=lambda a: a.name)
-
-        # Apply group filter if active
-        current_filter = getattr(self, '_current_group_filter', None)
-        if current_filter and current_filter not in ["All Groups"]:
-            if current_filter == "Ungrouped":
-                aliases = [a for a in aliases if not a.group]
-            else:
-                aliases = [a for a in aliases if a.group == current_filter]
-
-        if search_term:
-            search_lower = search_term.lower()
-            aliases = [
-                a for a in aliases
-                if search_lower in a.name.lower()
-                or search_lower in a.command.lower()
-                or (a.description and search_lower in a.description.lower())
-            ]
-
-        for alias in aliases:
-            table.add_row(
-                f"[bold cyan]{alias.name}[/]",
-                alias.command,
-                alias.description or "[dim]—[/]",
-                key=alias.name
-            )
-
-        self.update_status(len(aliases))
+        
+        # Refresh the table with the current filter
+        self.refresh_table()
 
     def update_status(self, shown: int = None) -> None:
         status = self.query_one("#status-bar", Static)
