@@ -51,6 +51,7 @@ def porter_data() -> Dict[str, Any]:
                 "used_count": 0,
                 "last_used": None,
                 "usage_history": [],
+                "group": None,
             },
             {
                 "name": "alix-test-echo",
@@ -62,6 +63,7 @@ def porter_data() -> Dict[str, Any]:
                 "used_count": 0,
                 "last_used": None,
                 "usage_history": [],
+                "group": None,
             },
         ],
     }
