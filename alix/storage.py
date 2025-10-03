@@ -6,6 +6,7 @@ from datetime import datetime
 
 from alix.models import Alias, TEST_ALIAS_NAME
 from alix.usage_tracker import UsageTracker
+from alix.history_manager import HistoryManager
 
 
 class AliasStorage:
@@ -21,11 +22,13 @@ class AliasStorage:
             self.storage_path = self.storage_dir / "aliases.json"
             self.storage_dir.mkdir(exist_ok=True)
 
+        self.storage_dir = self.storage_path.parent
         self.backup_dir = self.storage_path.parent / "backups"
         self.backup_dir.mkdir(exist_ok=True)
 
         self.aliases: Dict[str, Alias] = {}
-        self.usage_tracker = UsageTracker(self.storage_path.parent)
+        self.usage_tracker = UsageTracker(self.storage_dir)
+        self.history = HistoryManager(self.storage_dir / "history.json")
         self.load()
 
     def create_backup(self) -> Optional[Path]:
@@ -78,21 +81,26 @@ class AliasStorage:
         with open(self.storage_path, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
-    def add(self, alias: Alias) -> bool:
+    def add(self, alias: Alias, record_history: bool = True) -> bool:
         """Add a new alias, return True if successful"""
         if alias.name in self.aliases:
             return False
         self.create_backup()  # Backup before modification
         self.aliases[alias.name] = alias
         self.save()
+        if record_history:
+            self.history.push({"type": "add", "aliases": [alias.to_dict()]})
         return True
 
-    def remove(self, name: str) -> bool:
+    def remove(self, name: str, record_history: bool = True) -> bool:
         """Remove an alias, return True if it existed"""
         if name in self.aliases:
+            alias_snapshot = self.aliases.get(name)
             self.create_backup()  # Backup before modification
             del self.aliases[name]
             self.save()
+            if record_history and alias_snapshot:
+                self.history.push({"type": "remove", "aliases": [alias_snapshot.to_dict()]})
             return True
         return False
 
@@ -159,10 +167,20 @@ class AliasStorage:
 
     def remove_group(self, group_name: str) -> int:
         """Remove all aliases in a group, return count of removed aliases"""
-        count = 0
         aliases_to_remove = [name for name, alias in self.aliases.items() if alias.group == group_name]
+        if not aliases_to_remove:
+            return 0
+
+        removed_aliases = []
+        count = 0
         for name in aliases_to_remove:
-            if self.remove(name):
+            alias_obj = self.aliases.get(name)
+            if self.remove(name, record_history=False) and alias_obj:
+                removed_aliases.append(alias_obj.to_dict())
                 count += 1
+
+        if removed_aliases:
+            self.history.push({"type": "remove_group", "aliases": removed_aliases})
+
         return count
 

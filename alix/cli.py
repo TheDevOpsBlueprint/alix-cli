@@ -16,7 +16,8 @@ from alix.shell_detector import ShellType
 from alix.scanner import AliasScanner
 from alix.porter import AliasPorter
 from alix.config import Config
-from click.core import shell_complete as _click_shell_complete
+from alix.history_manager import HistoryManager
+from click.shell_completion import shell_complete as _click_shell_complete
 from alix.shell_wrapper import ShellWrapper
 import json  
 from datetime import datetime  
@@ -85,7 +86,7 @@ def add(name, command, description, no_apply, force):
         exit()
 
     alias = Alias(name=name, command=command, description=description)
-    if storage.add(alias):
+    if storage.add(alias, record_history=True):
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
 
         # Auto-apply to shell unless disabled
@@ -129,8 +130,8 @@ def edit(name, command, description, no_apply):
             alias.command = command
         if description:
             alias.description = description
-        storage.remove(alias.name)
-        storage.add(alias)
+        storage.remove(alias.name, record_history=True)
+        storage.add(alias, record_history=True)
         console.print(f"[green]✓[/] Added alias: [cyan]{name}[/] = '{command}'")
 
         if not no_apply:
@@ -197,9 +198,9 @@ def scan(merge, source, file):
                 skipped_count += 1
                 continue
             else:
-                storage.remove(alias.name)
+                storage.remove(alias.name, record_history=True)
 
-        if storage.add(alias):
+        if storage.add(alias, record_history=True):
             imported_count += 1
             console.print(f"[green]✓[/] Imported: [cyan]{alias.name}[/]")
 
@@ -473,6 +474,50 @@ def track(alias_name, context):
     console.print(f"[dim]Total uses: {alias.used_count}[/]")
     if alias.last_used:
         console.print(f"[dim]Last used: {alias.last_used.strftime('%Y-%m-%d %H:%M:%S')}[/]")
+
+
+@main.command()
+def undo():
+    """Undo the last alias operation."""
+    msg = storage.history.perform_undo(storage)
+    console.print(msg)
+
+
+@main.command()
+def redo():
+    """Redo the last undone alias operation."""
+    msg = storage.history.perform_redo(storage)
+    console.print(msg)
+
+
+@main.command()
+def list_undo():
+    """List the undo history."""
+    undo_ops = storage.history.list_undo()
+    if not undo_ops:
+        console.print("[dim]No undo history.[/]")
+        return
+    console.print("[bold cyan]Undo History (most recent last):[/]")
+    for i, op in enumerate(undo_ops, 1):
+        op_type = op.get("type", "unknown")
+        aliases = [a.get("name", "N/A") for a in op.get("aliases", [])]
+        timestamp = op.get("timestamp", "N/A")
+        console.print(f"{i}. [{op_type.upper()}] {', '.join(aliases)} at {timestamp}")
+
+
+@main.command()
+def list_redo():
+    """List the redo history."""
+    redo_ops = storage.history.list_redo()
+    if not redo_ops:
+        console.print("[dim]No redo history.[/]")
+        return
+    console.print("[bold cyan]Redo History (most recent last):[/]")
+    for i, op in enumerate(redo_ops, 1):
+        op_type = op.get("type", "unknown")
+        aliases = [a.get("name", "N/A") for a in op.get("aliases", [])]
+        timestamp = op.get("timestamp", "N/A")
+        console.print(f"{i}. [{op_type.upper()}] {', '.join(aliases)} at {timestamp}")
 
 
 @main.command()
@@ -848,6 +893,3 @@ def apply(group_name, apply):
         target_file = integrator.get_target_file()
         if target_file:
             console.print(f"\n[dim]💡 Run 'source {target_file}' to activate in current session[/]")
-
-if __name__ == "__main__":
-    main()
