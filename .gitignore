@@ -208,3 +208,5 @@ __marimo__/
 
 # Project specific virtual environment
 alix-venv/
+
+.idea/
