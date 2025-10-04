@@ -199,6 +199,7 @@ def test_get(mock_mkdir, alias):
 @patch("os.mkdir")
 def test_list_all(mock_mkdir, alias_list):
     storage = AliasStorage()
+    storage.aliases.clear()  # Clear any loaded aliases for test isolation
     storage.aliases[alias_list[0].name] = alias_list[0]
     storage.aliases[alias_list[1].name + "-2"] = alias_list[1]
 
