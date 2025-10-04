@@ -116,6 +116,9 @@ class AddAliasModal(ModalScreen[bool]):
                 yield Label("Description", classes="field-label")
                 yield Input(placeholder="Optional description", id="description")
 
+                yield Label("Tags", classes="field-label")
+                yield Input(placeholder="Comma-separated tags (e.g., git, dev, tools)", id="tags")
+
                 yield Checkbox("Force Override", id="force")
 
             with Horizontal(id="button-row"):
@@ -128,7 +131,13 @@ class AddAliasModal(ModalScreen[bool]):
             name = self.query_one("#name", Input).value.strip()
             command = self.query_one("#command", Input).value.strip()
             desc = self.query_one("#description", Input).value.strip()
+            tags_input = self.query_one("#tags", Input).value.strip()
             force = self.query_one("#force", Checkbox).value
+            
+            # Parse tags
+            tags = []
+            if tags_input:
+                tags = [tag.strip() for tag in tags_input.split(",") if tag.strip()]
 
             if name and command:
                 storage = AliasStorage()
@@ -162,7 +171,7 @@ class AddAliasModal(ModalScreen[bool]):
                         severity="error",
                     )
                 else:
-                    alias = Alias(name=name, command=command, description=desc or None)
+                    alias = Alias(name=name, command=command, description=desc or None, tags=tags)
                     if storage.add(alias):
                         # Auto-apply the alias
                         integrator = ShellIntegrator()
@@ -467,10 +476,16 @@ class HelpModal(ModalScreen):
                     "p - Apply all aliases to shell config", classes="help-item"
                 )
 
+                yield Static("FILTERING", classes="help-category")
+                yield Static("g - Filter by group", classes="help-item")
+                yield Static("t - Filter by tag", classes="help-item")
+                yield Static("f - Toggle fuzzy search", classes="help-item")
+
                 yield Static("APPLICATION", classes="help-category")
                 yield Static("r - Refresh alias list from disk", classes="help-item")
                 yield Static("? - Show this help overlay", classes="help-item")
                 yield Static("q - Quit the application", classes="help-item")
+                yield Static("g - Filter by group", classes="help-item")
 
     def action_close_help(self) -> None:
         """Close the help modal."""
@@ -603,11 +618,14 @@ class AliasManager(App):
         Binding("r", "refresh", "Refresh", show=True),
         Binding("p", "apply_all", "Apply All", show=True),  # NEW BINDING
         Binding("f", "toggle_fuzzy", "Fuzzy", show=True),  # NEW FUZZY SEARCH BINDING
+        Binding("g", "filter_by_group", "Group", show=True),  # NEW GROUP FILTER BINDING
+        Binding("t", "filter_by_tag", "Tag", show=True),  # NEW TAG FILTER BINDING
         Binding("/", "focus_search", "Search", show=True),
         Binding("escape", "clear_search", "Clear", show=False),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("?", "show_help", "Help", show=True),
+        Binding("g", "filter_by_group", "Filter by Group", show=True),
     ]
 
     def __init__(self):
@@ -616,6 +634,8 @@ class AliasManager(App):
         self.config = Config()
         self.selected_alias = None
         self.fuzzy_search_enabled = False  # NEW: Fuzzy search toggle
+        self._current_group_filter = None  # NEW: Group filter state
+        self._current_tag_filter = None    # NEW: Tag filter state
 
     def compose(self) -> ComposeResult:
         # Header
@@ -656,9 +676,10 @@ class AliasManager(App):
     def on_mount(self) -> None:
         table = self.query_one("#table", DataTable)
         table.add_column("Name", width=15)
-        table.add_column("Command", width=40)
-        table.add_column("Description", width=30)
-        table.add_column("Group", width=15)
+        table.add_column("Command", width=35)
+        table.add_column("Description", width=25)
+        table.add_column("Group", width=12)
+        table.add_column("Tags", width=15)
 
         self.refresh_table()
         self.update_status()
@@ -669,13 +690,21 @@ class AliasManager(App):
 
         aliases = sorted(self.storage.list_all(), key=lambda a: a.name)
 
-        current_filter = getattr(self, '_current_group_filter', None)
-        if current_filter and current_filter not in ["All Groups"]:
-            if current_filter == "Ungrouped":
+        # Apply group filter
+        current_group_filter = getattr(self, '_current_group_filter', None)
+        if current_group_filter and current_group_filter not in ["All Groups"]:
+            if current_group_filter == "Ungrouped":
                 aliases = [a for a in aliases if not a.group]
             else:
-                aliases = [a for a in aliases if a.group == current_filter]
+                aliases = [a for a in aliases if a.group == current_group_filter]
 
+        # Apply tag filter
+        current_tag_filter = getattr(self, '_current_tag_filter', None)
+        if current_tag_filter and current_tag_filter not in ["All Tags"]:
+            if current_tag_filter == "Untagged":
+                aliases = [a for a in aliases if not a.tags]
+            else:
+                aliases = [a for a in aliases if current_tag_filter in a.tags]
 
         if search_term:
             if self.fuzzy_search_enabled:
@@ -719,10 +748,14 @@ class AliasManager(App):
                 ]
 
         for alias in aliases:
+            tags_str = ", ".join(alias.tags) if alias.tags else "[dim]—[/]"
+            group_str = alias.group or "[dim]—[/]"
             table.add_row(
                 f"[bold cyan]{alias.name}[/]",
                 alias.command,
                 alias.description or "[dim]—[/]",
+                group_str,
+                tags_str,
                 key=alias.name,
             )
 
@@ -737,13 +770,23 @@ class AliasManager(App):
             "[green]Fuzzy ON[/]" if self.fuzzy_search_enabled else "[dim]Fuzzy OFF[/]"
         )
 
+        # Add filter indicators
+        filter_text = ""
+        current_group_filter = getattr(self, '_current_group_filter', None)
+        current_tag_filter = getattr(self, '_current_tag_filter', None)
+        
+        if current_group_filter and current_group_filter != "All Groups":
+            filter_text += f" | Group: {current_group_filter}"
+        if current_tag_filter and current_tag_filter != "All Tags":
+            filter_text += f" | Tag: {current_tag_filter}"
+
         if shown is not None:
             status.update(
-                f"Showing {shown} of {total} aliases | {fuzzy_status} | Press 'p' to apply all"
+                f"Showing {shown} of {total} aliases | {fuzzy_status}{filter_text} | Press 'p' to apply all"
             )
         else:
             status.update(
-                f"Total: {total} aliases | {fuzzy_status} | Press 'p' to apply all"
+                f"Total: {total} aliases | {fuzzy_status}{filter_text} | Press 'p' to apply all"
             )
 
     def update_info_panel(self, alias: Alias) -> None:
@@ -755,6 +798,9 @@ class AliasManager(App):
         command = Text(alias.command or "")
         description = Text(alias.description or "None")
 
+        tags_text = Text(", ".join(alias.tags) if alias.tags else "None")
+        group_text = Text(alias.group or "None")
+        
         info.update(
             Text.assemble(
                 ("Name: ", "bold"),
@@ -765,6 +811,12 @@ class AliasManager(App):
                 "\n",
                 ("Description: ", "bold"),
                 description,
+                "\n",
+                ("Group: ", "bold"),
+                group_text,
+                "\n",
+                ("Tags: ", "bold"),
+                tags_text,
                 "\n",
                 ("Used: ", "bold"),
                 f"{alias.used_count} times\n",
@@ -907,6 +959,32 @@ class AliasManager(App):
             self.action_refresh()
     
     def action_filter_by_group(self) -> None:
+        # Always build group list from ALL aliases
+        all_aliases = self.storage.list_all()
+        groups = sorted(set(alias.group for alias in all_aliases if alias.group))
+        groups_list = ["All Groups"] + groups + ["Ungrouped"]
+
+        # Find current filter and cycle to next
+        current_filter = getattr(self, '_current_group_filter', None)
+        try:
+            idx = groups_list.index(current_filter) if current_filter in groups_list else 0
+            next_idx = (idx + 1) % len(groups_list)
+        except ValueError:
+            next_idx = 0
+        selected_group = groups_list[next_idx]
+        self._current_group_filter = selected_group
+
+        # Refresh table with new filter
+        self.refresh_table()
+
+        # Notify user
+        if selected_group == "All Groups":
+            self.notify("Showing all aliases", severity="information")
+        elif selected_group == "Ungrouped":
+            self.notify("Showing ungrouped aliases", severity="information")
+        else:
+            self.notify(f"Showing aliases in group: {selected_group}", severity="information")
+
         """Filter aliases by group"""
         aliases = self.storage.list_all()
         groups = set()
@@ -945,43 +1023,50 @@ class AliasManager(App):
         
         # Apply the filter
         if selected_group == "All Groups":
-            self.refresh_table()
             self.notify("Showing all aliases", severity="information")
         elif selected_group == "Ungrouped":
             self.notify("Showing ungrouped aliases", severity="information")
         else:
             self.notify(f"Showing aliases in group: {selected_group}", severity="information")
-        table = self.query_one("#table", DataTable)
-        table.clear()
 
-        aliases = sorted(self.storage.list_all(), key=lambda a: a.name)
-
-        # Apply group filter if active
-        current_filter = getattr(self, '_current_group_filter', None)
-        if current_filter and current_filter not in ["All Groups"]:
-            if current_filter == "Ungrouped":
-                aliases = [a for a in aliases if not a.group]
-            else:
-                aliases = [a for a in aliases if a.group == current_filter]
-
-        if search_term:
-            search_lower = search_term.lower()
-            aliases = [
-                a for a in aliases
-                if search_lower in a.name.lower()
-                or search_lower in a.command.lower()
-                or (a.description and search_lower in a.description.lower())
-            ]
-
-        for alias in aliases:
-            table.add_row(
-                f"[bold cyan]{alias.name}[/]",
-                alias.command,
-                alias.description or "[dim]—[/]",
-                key=alias.name
-            )
-
-        self.update_status(len(aliases))
+    def action_filter_by_tag(self) -> None:
+        """Filter aliases by tag"""
+        # Always build tag list from ALL aliases
+        all_aliases = self.storage.list_all()
+        tags = set()
+        
+        # Collect all unique tags
+        for alias in all_aliases:
+            tags.update(alias.tags)
+        
+        if not tags:
+            self.notify("No tags found. Create some aliases with tags first.", severity="warning")
+            return
+        
+        # Create tag list with special options
+        tags_list = ["All Tags"] + sorted(list(tags)) + ["Untagged"]
+        
+        # Find current filter and cycle to next
+        current_filter = getattr(self, '_current_tag_filter', None)
+        try:
+            idx = tags_list.index(current_filter) if current_filter in tags_list else 0
+            next_idx = (idx + 1) % len(tags_list)
+        except ValueError:
+            next_idx = 0
+        
+        selected_tag = tags_list[next_idx]
+        self._current_tag_filter = selected_tag
+        
+        # Refresh table with new filter
+        self.refresh_table()
+        
+        # Notify user
+        if selected_tag == "All Tags":
+            self.notify("Showing all aliases", severity="information")
+        elif selected_tag == "Untagged":
+            self.notify("Showing untagged aliases", severity="information")
+        else:
+            self.notify(f"Showing aliases with tag: {selected_tag}", severity="information")
 
     def update_status(self, shown: int = None) -> None:
         status = self.query_one("#status-bar", Static)
