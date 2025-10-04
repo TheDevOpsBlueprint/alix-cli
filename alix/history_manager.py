@@ -73,7 +73,7 @@ class HistoryManager:
             # If invalid alias data, raise so caller can skip
             raise
 
-    def undo(self, storage) -> str:
+    def perform_undo(self, storage) -> str:
         """Undo last op. storage must implement add(alias, record_history=False) and remove(name, record_history=False)."""
         if not self.undo:
             return "Nothing to undo."
@@ -81,25 +81,30 @@ class HistoryManager:
         op_type = op.get("type")
         aliases = op.get("aliases", [])
         performed = 0
+        skipped = 0
 
         if op_type == "add":
             # inverse: remove by name
             for a in aliases:
                 name = a.get("name")
                 if not name:
+                    skipped += 1
                     continue
                 try:
                     if storage.remove(name, record_history=False):
                         performed += 1
                 except Exception:
-                    # skip problematic entries
+                    skipped += 1
                     continue
             self.redo.append(op)
             # trim redo
             if len(self.redo) > MAX_HISTORY:
                 self.redo = self.redo[-MAX_HISTORY:]
             self.save()
-            return f"Undid add ({performed}/{len(aliases)} removed)."
+            msg = f"Undid add ({performed}/{len(aliases)} removed)"
+            if skipped > 0:
+                msg += f", {skipped} skipped"
+            return msg
 
         if op_type in ("remove", "remove_group"):
             # inverse: re-add aliases
@@ -107,21 +112,26 @@ class HistoryManager:
                 try:
                     alias_obj = self._load_alias(a)
                 except Exception:
+                    skipped += 1
                     continue
                 try:
                     if storage.add(alias_obj, record_history=False):
                         performed += 1
                 except Exception:
+                    skipped += 1
                     continue
             self.redo.append(op)
             if len(self.redo) > MAX_HISTORY:
                 self.redo = self.redo[-MAX_HISTORY:]
             self.save()
-            return f"Undid {op_type} ({performed}/{len(aliases)} restored)."
+            msg = f"Undid {op_type} ({performed}/{len(aliases)} restored)"
+            if skipped > 0:
+                msg += f", {skipped} skipped"
+            return msg
 
         return f"Unknown operation type: {op_type}"
 
-    def redo(self, storage) -> str:
+    def perform_redo(self, storage) -> str:
         """Redo last undone op. storage must implement add(alias, record_history=False) and remove(name, record_history=False)."""
         if not self.redo:
             return "Nothing to redo."
@@ -129,38 +139,49 @@ class HistoryManager:
         op_type = op.get("type")
         aliases = op.get("aliases", [])
         performed = 0
+        skipped = 0
 
         if op_type == "add":
             for a in aliases:
                 try:
                     alias_obj = self._load_alias(a)
                 except Exception:
+                    skipped += 1
                     continue
                 try:
                     if storage.add(alias_obj, record_history=False):
                         performed += 1
                 except Exception:
+                    skipped += 1
                     continue
             self.undo.append(op)
             if len(self.undo) > MAX_HISTORY:
                 self.undo = self.undo[-MAX_HISTORY:]
             self.save()
-            return f"Redid add ({performed}/{len(aliases)} added)."
+            msg = f"Redid add ({performed}/{len(aliases)} added)"
+            if skipped > 0:
+                msg += f", {skipped} skipped"
+            return msg
 
         if op_type in ("remove", "remove_group"):
             for a in aliases:
                 name = a.get("name")
                 if not name:
+                    skipped += 1
                     continue
                 try:
                     if storage.remove(name, record_history=False):
                         performed += 1
                 except Exception:
+                    skipped += 1
                     continue
             self.undo.append(op)
             if len(self.undo) > MAX_HISTORY:
                 self.undo = self.undo[-MAX_HISTORY:]
             self.save()
-            return f"Redid {op_type} ({performed}/{len(aliases)} removed)."
+            msg = f"Redid {op_type} ({performed}/{len(aliases)} removed)"
+            if skipped > 0:
+                msg += f", {skipped} skipped"
+            return msg
 
         return f"Unknown operation type: {op_type}"
