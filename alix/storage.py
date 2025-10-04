@@ -165,3 +165,23 @@ class AliasStorage:
             if self.remove(name):
                 count += 1
         return count
+
+    def get_by_tag(self, tag_name: str) -> List[Alias]:
+        """Get all aliases with a specific tag"""
+        return [alias for alias in self.aliases.values() if tag_name in alias.tags]
+
+    def get_tags(self) -> List[str]:
+        """Get all unique tag names"""
+        tags = set()
+        for alias in self.aliases.values():
+            tags.update(alias.tags)
+        return sorted(list(tags))
+
+    def get_tag_counts(self) -> Dict[str, int]:
+        """Get count of aliases per tag"""
+        tag_counts = {}
+        for alias in self.aliases.values():
+            for tag in alias.tags:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        return tag_counts
+
