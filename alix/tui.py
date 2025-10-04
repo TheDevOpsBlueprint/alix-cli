@@ -471,6 +471,7 @@ class HelpModal(ModalScreen):
                 yield Static("r - Refresh alias list from disk", classes="help-item")
                 yield Static("? - Show this help overlay", classes="help-item")
                 yield Static("q - Quit the application", classes="help-item")
+                yield Static("g - Filter by group", classes="help-item")
 
     def action_close_help(self) -> None:
         """Close the help modal."""
@@ -608,6 +609,7 @@ class AliasManager(App):
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("?", "show_help", "Help", show=True),
+        Binding("g", "filter_by_group", "Filter by Group", show=True),
     ]
 
     def __init__(self):
@@ -723,6 +725,7 @@ class AliasManager(App):
                 f"[bold cyan]{alias.name}[/]",
                 alias.command,
                 alias.description or "[dim]—[/]",
+                alias.group or "[dim]—[/]", 
                 key=alias.name,
             )
 
@@ -907,6 +910,32 @@ class AliasManager(App):
             self.action_refresh()
     
     def action_filter_by_group(self) -> None:
+        # Always build group list from ALL aliases
+        all_aliases = self.storage.list_all()
+        groups = sorted(set(alias.group for alias in all_aliases if alias.group))
+        groups_list = ["All Groups"] + groups + ["Ungrouped"]
+
+        # Find current filter and cycle to next
+        current_filter = getattr(self, '_current_group_filter', None)
+        try:
+            idx = groups_list.index(current_filter) if current_filter in groups_list else 0
+            next_idx = (idx + 1) % len(groups_list)
+        except ValueError:
+            next_idx = 0
+        selected_group = groups_list[next_idx]
+        self._current_group_filter = selected_group
+
+        # Refresh table with new filter
+        self.refresh_table()
+
+        # Notify user
+        if selected_group == "All Groups":
+            self.notify("Showing all aliases", severity="information")
+        elif selected_group == "Ungrouped":
+            self.notify("Showing ungrouped aliases", severity="information")
+        else:
+            self.notify(f"Showing aliases in group: {selected_group}", severity="information")
+
         """Filter aliases by group"""
         aliases = self.storage.list_all()
         groups = set()
@@ -945,7 +974,6 @@ class AliasManager(App):
         
         # Apply the filter
         if selected_group == "All Groups":
-            self.refresh_table()
             self.notify("Showing all aliases", severity="information")
         elif selected_group == "Ungrouped":
             self.notify("Showing ungrouped aliases", severity="information")
@@ -964,20 +992,13 @@ class AliasManager(App):
             else:
                 aliases = [a for a in aliases if a.group == current_filter]
 
-        if search_term:
-            search_lower = search_term.lower()
-            aliases = [
-                a for a in aliases
-                if search_lower in a.name.lower()
-                or search_lower in a.command.lower()
-                or (a.description and search_lower in a.description.lower())
-            ]
 
         for alias in aliases:
             table.add_row(
                 f"[bold cyan]{alias.name}[/]",
                 alias.command,
                 alias.description or "[dim]—[/]",
+                alias.group or "[dim]—[/]",
                 key=alias.name
             )
 
