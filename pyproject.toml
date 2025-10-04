@@ -27,6 +27,7 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "freezegun>=1.5.5",
+    "pytest-asyncio>=1.2.0",
 ]
 
 [project.scripts]
