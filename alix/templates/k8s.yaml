@@ -1,0 +1,36 @@
+version: "1.0"
+category: "kubernetes"
+description: "Common Kubernetes aliases for cluster management"
+aliases:
+  - name: "k"
+    command: "kubectl"
+    description: "Kubernetes CLI"
+    tags: ["k8s", "kubectl"]
+  - name: "kgp"
+    command: "kubectl get pods"
+    description: "Get pods"
+    tags: ["k8s", "pods"]
+  - name: "kgs"
+    command: "kubectl get services"
+    description: "Get services"
+    tags: ["k8s", "services"]
+  - name: "kgd"
+    command: "kubectl get deployments"
+    description: "Get deployments"
+    tags: ["k8s", "deployments"]
+  - name: "kgn"
+    command: "kubectl get nodes"
+    description: "Get nodes"
+    tags: ["k8s", "nodes"]
+  - name: "kl"
+    command: "kubectl logs"
+    description: "Show logs"
+    tags: ["k8s", "logs"]
+  - name: "kd"
+    command: "kubectl describe"
+    description: "Describe resource"
+    tags: ["k8s", "describe"]
+  - name: "kctx"
+    command: "kubectl config current-context"
+    description: "Show current context"
+    tags: ["k8s", "context"]

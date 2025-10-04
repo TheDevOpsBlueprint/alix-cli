@@ -1,0 +1,36 @@
+version: "1.0"
+category: "docker"
+description: "Common Docker aliases for container management"
+aliases:
+  - name: "di"
+    command: "docker images"
+    description: "List Docker images"
+    tags: ["docker", "images"]
+  - name: "dc"
+    command: "docker ps"
+    description: "List running containers"
+    tags: ["docker", "containers"]
+  - name: "dca"
+    command: "docker ps -a"
+    description: "List all containers"
+    tags: ["docker", "containers"]
+  - name: "dr"
+    command: "docker run"
+    description: "Run a container"
+    tags: ["docker", "run"]
+  - name: "db"
+    command: "docker build"
+    description: "Build an image"
+    tags: ["docker", "build"]
+  - name: "de"
+    command: "docker exec -it"
+    description: "Execute command in container"
+    tags: ["docker", "exec"]
+  - name: "dl"
+    command: "docker logs"
+    description: "Show container logs"
+    tags: ["docker", "logs"]
+  - name: "drm"
+    command: "docker rm"
+    description: "Remove container"
+    tags: ["docker", "remove"]

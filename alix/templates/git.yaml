@@ -1,0 +1,36 @@
+version: "1.0"
+category: "git"
+description: "Common Git aliases for version control"
+aliases:
+  - name: "gs"
+    command: "git status"
+    description: "Show git status"
+    tags: ["git", "status"]
+  - name: "ga"
+    command: "git add"
+    description: "Add files to staging"
+    tags: ["git", "add"]
+  - name: "gc"
+    command: "git commit -m"
+    description: "Commit with message"
+    tags: ["git", "commit"]
+  - name: "gp"
+    command: "git push"
+    description: "Push to remote"
+    tags: ["git", "push"]
+  - name: "gl"
+    command: "git log --oneline -10"
+    description: "Show recent commits"
+    tags: ["git", "log"]
+  - name: "gb"
+    command: "git branch"
+    description: "List branches"
+    tags: ["git", "branch"]
+  - name: "gco"
+    command: "git checkout"
+    description: "Checkout branch"
+    tags: ["git", "checkout"]
+  - name: "gd"
+    command: "git diff"
+    description: "Show diff"
+    tags: ["git", "diff"]
