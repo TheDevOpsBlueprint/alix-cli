@@ -14,14 +14,14 @@ class UsageRecord:
     """Represents a single usage event of an alias"""
     timestamp: datetime
     context: Optional[str] = None  # Additional context like working directory, shell session, etc.
-    
+
     def to_dict(self) -> dict:
         """Convert usage record to dictionary for storage"""
         return {
             "timestamp": self.timestamp.isoformat(),
             "context": self.context
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "UsageRecord":
         """Create usage record from dictionary"""
@@ -73,14 +73,14 @@ class Alias:
         if "usage_history" in data:
             data["usage_history"] = [UsageRecord.from_dict(record) for record in data["usage_history"]]
         return cls(**data)
-    
+
     def record_usage(self, context: Optional[str] = None) -> None:
         """Record a usage event for this alias"""
         now = datetime.now()
         self.used_count += 1
         self.last_used = now
         self.usage_history.append(UsageRecord(timestamp=now, context=context))
-        
+
         # Keep only last 100 usage records to prevent storage bloat
         if len(self.usage_history) > 100:
             self.usage_history = self.usage_history[-100:]
@@ -95,14 +95,14 @@ class Alias:
                 "usage_frequency": 0,
                 "recent_usage": []
             }
-        
+
         # Calculate usage frequency (uses per day since creation)
         days_since_creation = (datetime.now() - self.created_at).days
         usage_frequency = self.used_count / max(days_since_creation, 1)
-        
+
         # Get recent usage (last 10 records)
         recent_usage = self.usage_history[-10:] if len(self.usage_history) > 10 else self.usage_history
-        
+
         return {
             "total_uses": self.used_count,
             "first_used": self.usage_history[0].timestamp if self.usage_history else None,
