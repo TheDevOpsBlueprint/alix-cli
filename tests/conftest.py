@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Any, Dict, List
 from unittest.mock import ANY
@@ -16,6 +17,9 @@ def alias() -> Alias:
         tags=["a", "b"],
         shell="zsh",
         created_at=datetime(2025, 10, 24, 16, 34, 21, 653023),
+        last_used=None,
+        usage_history=[],
+        group=None,
     )
 
 
@@ -70,8 +74,32 @@ def porter_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
+def storage_file_raw_data() -> str:
+    return """
+    {
+        "alix-test-echo": {
+            "name": "alix-test-echo",
+            "command": "alix test working!",
+            "description": "alix test shortcut",
+            "tags": ["a", "b"],
+            "created_at": "2025-10-24T16:34:21.653023",
+            "used_count": 0,
+            "shell": "zsh",
+            "last_used": null,
+            "usage_history": [],
+            "group": null
+        }
+    }
+    """
+
+
+@pytest.fixture
+def storage_file_data(storage_file_raw_data) -> Dict[str, Any]:
+    return json.loads(storage_file_raw_data)
+
+
+@pytest.fixture
 def shell_file_data() -> str:
     return """
     alias alix-test-echo='alix test working!'
     """
-
