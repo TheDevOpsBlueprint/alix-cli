@@ -46,11 +46,12 @@ def main(ctx):
 @click.option("--name", "-n", prompt=True, help="Alias name")
 @click.option("--command", "-c", prompt=True, help="Command to alias")
 @click.option("--description", "-d", help="Description of the alias")
+@click.option("--tags", "-t", help="Comma-separated tags for the alias")
 @click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
 @click.option(
     "--force", is_flag=True, help="Force apply new alias over existing aliases/commands"
 )
-def add(name, command, description, no_apply, force):
+def add(name, command, description, tags, no_apply, force):
     """Add a new alias to your collection and apply it immediately"""
     msg = None
 
@@ -83,7 +84,12 @@ def add(name, command, description, no_apply, force):
         console.print(msg)
         exit()
 
-    alias = Alias(name=name, command=command, description=description)
+    # Parse tags if provided
+    tag_list = []
+    if tags:
+        tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    
+    alias = Alias(name=name, command=command, description=description, tags=tag_list)
     if storage.add(alias):
         console.print(f"[green]✔[/] Added alias: [cyan]{name}[/] = '{command}'")
 
@@ -102,53 +108,9 @@ def add(name, command, description, no_apply, force):
                 )
             else:
                 console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
-                console.print(
-                    f"[dim]   Run 'alix apply' to apply all aliases to shell[/]"
-                )
+                console.print(f"[dim]   Run 'alix apply' to apply all aliases to shell[/]")
     else:
-        console.print(
-            f"[red]✗[/] Alias '{name}' already exists in alix!\nEdit the alias to override it"
-        )
-
-
-@main.command()
-@click.option("--name", "-n", prompt=True, help="Alias name")
-@click.option("--command", "-c", prompt=True, help="Command to alias")
-@click.option("--description", "-d", prompt=True, help="Description of the alias")
-@click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
-def edit(name, command, description, no_apply):
-    """Add a new alias to your collection and apply it immediately"""
-    msg = None
-
-    alias = storage.get(name)
-    if alias is None:
-        console.print(f"[red]x[/]The alias '{name}' does not exist in alix yet")
-    else:
-        if command:
-            alias.command = command
-        if description:
-            alias.description = description
-        storage.remove(alias.name)
-        storage.add(alias)
-        console.print(f"[green]✔[/] Added alias: [cyan]{name}[/] = '{command}'")
-
-        if not no_apply:
-            integrator = ShellIntegrator()
-            success, message = integrator.apply_single_alias(alias)
-
-            if success:
-                console.print(f"[green]✔[/] {message}")
-                console.print(
-                    f"[dim]💡 Alias '{name}' is now available in new shell sessions[/]"
-                )
-                console.print(
-                    f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]"
-                )
-            else:
-                console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
-                console.print(
-                    f"[dim]   Run 'alix apply' to apply all aliases to shell[/]"
-                )
+        console.print(f"[red]✗[/] Alias '{name}' already exists!")
 
 
 @main.command()
@@ -161,7 +123,8 @@ def edit(name, command, description, no_apply):
     help="Import source",
 )
 @click.option("--file", "-f", type=click.Path(exists=True), help="File to import from")
-def scan(merge, source, file):
+@click.option("--tag", "-t", help="Add a tag to all imported aliases")
+def scan(merge, source, file, tag):
     """Scan and import existing aliases from your system"""
     scanner = AliasScanner()
     imported_count = 0
@@ -197,6 +160,10 @@ def scan(merge, source, file):
                 continue
             else:
                 storage.remove(alias.name)
+
+        # Add tag if specified
+        if tag and tag not in alias.tags:
+            alias.tags.append(tag)
 
         if storage.add(alias):
             imported_count += 1
@@ -639,11 +606,15 @@ def list_aliases():
 
     if config.get("show_descriptions", True):
         table.add_column("Description", style="dim")
+        table.add_column("Tags", style="yellow")
         for alias in sorted(aliases, key=lambda a: a.name):
-            table.add_row(alias.name, alias.command, alias.description or "")
+            tags_str = ", ".join(alias.tags) if alias.tags else "—"
+            table.add_row(alias.name, alias.command, alias.description or "", tags_str)
     else:
+        table.add_column("Tags", style="yellow")
         for alias in sorted(aliases, key=lambda a: a.name):
-            table.add_row(alias.name, alias.command)
+            tags_str = ", ".join(alias.tags) if alias.tags else "—"
+            table.add_row(alias.name, alias.command, tags_str)
 
     console.print(table)
     console.print(f"\n[dim]💡 Tip: Run 'alix' for interactive mode![/]")
@@ -866,6 +837,343 @@ def apply(group_name, apply):
         if target_file:
             console.print(f"\n[dim]💡 Run 'source {target_file}' to activate in current session[/]")
 
+
+@main.group()
+def tag():
+    """Manage alias tags"""
+    pass
+
+@tag.command()
+def list():
+    """List all tags and their usage"""
+    aliases = storage.list_all()
+    tag_counts = {}
+    
+    # Count aliases per tag
+    for alias in aliases:
+        for tag in alias.tags:
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    
+    if not tag_counts:
+        console.print("[yellow]No tags found[/]")
+        return
+    
+    console.print(f"[bold cyan]📋 Tags ({len(tag_counts)} total)[/]")
+    
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Tag", style="cyan", width=20)
+    table.add_column("Count", style="yellow", width=10)
+    table.add_column("Aliases", style="white", width=50)
+    
+    for tag, count in sorted(tag_counts.items()):
+        # Get aliases with this tag
+        tagged_aliases = [a.name for a in aliases if tag in a.tags]
+        aliases_str = ", ".join(tagged_aliases[:5])  # Show first 5
+        if len(tagged_aliases) > 5:
+            aliases_str += f" ... (+{len(tagged_aliases) - 5} more)"
+        
+        table.add_row(tag, str(count), aliases_str)
+    
+    console.print(table)
+
+@tag.command()
+@click.argument("tag_name")
+def show(tag_name):
+    """Show all aliases with a specific tag"""
+    aliases = storage.list_all()
+    tagged_aliases = [a for a in aliases if tag_name in a.tags]
+    
+    if not tagged_aliases:
+        console.print(f"[yellow]No aliases found with tag '{tag_name}'[/]")
+        return
+    
+    console.print(f"[bold cyan]📋 Aliases with tag '{tag_name}' ({len(tagged_aliases)} total)[/]")
+    
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Name", style="cyan", width=20)
+    table.add_column("Command", style="white", width=40)
+    table.add_column("Description", style="dim", width=30)
+    table.add_column("Tags", style="yellow", width=20)
+    
+    for alias in sorted(tagged_aliases, key=lambda a: a.name):
+        tags_str = ", ".join(alias.tags) if alias.tags else "—"
+        table.add_row(
+            alias.name,
+            alias.command[:40] + "..." if len(alias.command) > 40 else alias.command,
+            alias.description or "—",
+            tags_str
+        )
+    
+    console.print(table)
+
+@tag.command()
+@click.argument("alias_name")
+@click.argument("tags", nargs=-1, required=True)
+def add(alias_name, tags):
+    """Add tags to an alias"""
+    alias = storage.get(alias_name)
+    if not alias:
+        console.print(f"[red]✗[/] Alias '{alias_name}' not found!")
+        return
+    
+    # Add new tags (avoid duplicates)
+    original_count = len(alias.tags)
+    for tag in tags:
+        if tag not in alias.tags:
+            alias.tags.append(tag)
+    
+    if len(alias.tags) > original_count:
+        storage.aliases[alias_name] = alias
+        storage.save()
+        added_count = len(alias.tags) - original_count
+        console.print(f"[green]✓[/] Added {added_count} tag(s) to '{alias_name}'")
+        console.print(f"[dim]Current tags: {', '.join(alias.tags)}[/]")
+    else:
+        console.print(f"[yellow]⚠[/] All specified tags already exist for '{alias_name}'")
+
+@tag.command()
+@click.argument("alias_name")
+@click.argument("tags", nargs=-1, required=True)
+def remove(alias_name, tags):
+    """Remove tags from an alias"""
+    alias = storage.get(alias_name)
+    if not alias:
+        console.print(f"[red]✗[/] Alias '{alias_name}' not found!")
+        return
+    
+    # Remove specified tags
+    original_count = len(alias.tags)
+    for tag in tags:
+        if tag in alias.tags:
+            alias.tags.remove(tag)
+    
+    if len(alias.tags) < original_count:
+        storage.aliases[alias_name] = alias
+        storage.save()
+        removed_count = original_count - len(alias.tags)
+        console.print(f"[green]✓[/] Removed {removed_count} tag(s) from '{alias_name}'")
+        if alias.tags:
+            console.print(f"[dim]Remaining tags: {', '.join(alias.tags)}[/]")
+        else:
+            console.print(f"[dim]No tags remaining[/]")
+    else:
+        console.print(f"[yellow]⚠[/] None of the specified tags exist for '{alias_name}'")
+
+@tag.command()
+@click.argument("old_tag")
+@click.argument("new_tag")
+@click.option("--dry-run", is_flag=True, help="Show what would be changed without making changes")
+def rename(old_tag, new_tag, dry_run):
+    """Rename a tag across all aliases"""
+    aliases = storage.list_all()
+    affected_aliases = [a for a in aliases if old_tag in a.tags]
+    
+    if not affected_aliases:
+        console.print(f"[yellow]No aliases found with tag '{old_tag}'[/]")
+        return
+    
+    console.print(f"[cyan]Found {len(affected_aliases)} aliases with tag '{old_tag}'[/]")
+    
+    if dry_run:
+        console.print(f"[bold]Would rename tag '{old_tag}' to '{new_tag}' in:[/]")
+        for alias in affected_aliases:
+            console.print(f"  • {alias.name}")
+        return
+    
+    # Confirm the change
+    if not click.confirm(f"Rename tag '{old_tag}' to '{new_tag}' in {len(affected_aliases)} aliases?"):
+        return
+    
+    # Perform the rename
+    updated_count = 0
+    for alias in affected_aliases:
+        if old_tag in alias.tags:
+            # Replace old tag with new tag
+            alias.tags = [new_tag if tag == old_tag else tag for tag in alias.tags]
+            storage.aliases[alias.name] = alias
+            updated_count += 1
+    
+    storage.save()
+    console.print(f"[green]✓[/] Renamed tag in {updated_count} aliases")
+
+@tag.command()
+@click.argument("tag_name")
+@click.option("--dry-run", is_flag=True, help="Show what would be changed without making changes")
+def delete(tag_name, dry_run):
+    """Delete a tag from all aliases"""
+    aliases = storage.list_all()
+    affected_aliases = [a for a in aliases if tag_name in a.tags]
+    
+    if not affected_aliases:
+        console.print(f"[yellow]No aliases found with tag '{tag_name}'[/]")
+        return
+    
+    console.print(f"[cyan]Found {len(affected_aliases)} aliases with tag '{tag_name}'[/]")
+    
+    if dry_run:
+        console.print(f"[bold]Would remove tag '{tag_name}' from:[/]")
+        for alias in affected_aliases:
+            console.print(f"  • {alias.name}")
+        return
+    
+    # Confirm the deletion
+    if not click.confirm(f"Remove tag '{tag_name}' from {len(affected_aliases)} aliases?"):
+        return
+    
+    # Remove the tag
+    updated_count = 0
+    for alias in affected_aliases:
+        if tag_name in alias.tags:
+            alias.tags.remove(tag_name)
+            storage.aliases[alias.name] = alias
+            updated_count += 1
+    
+    storage.save()
+    console.print(f"[green]✓[/] Removed tag from {updated_count} aliases")
+
+@tag.command()
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--tag", "-t", help="Import only aliases with specific tag")
+def import_tag(file, tag):
+    """Import aliases from a file, optionally filtered by tag"""
+    try:
+        with open(file, 'r') as f:
+            data = json.load(f)
+        
+        if "aliases" not in data:
+            console.print(f"[red]✗[/] Invalid export file")
+            return
+        
+        imported = 0
+        skipped = 0
+        tag_filtered = 0
+        
+        for alias_data in data["aliases"]:
+            alias = Alias.from_dict(alias_data)
+            
+            # Apply tag filter if specified
+            if tag and tag not in alias.tags:
+                tag_filtered += 1
+                continue
+            
+            if alias.name not in storage.aliases:
+                storage.aliases[alias.name] = alias
+                imported += 1
+            else:
+                skipped += 1
+        
+        storage.save()
+        
+        console.print(f"[green]✓[/] Imported {imported} aliases")
+        if skipped > 0:
+            console.print(f"[yellow]⚠[/] Skipped {skipped} existing aliases")
+        if tag_filtered > 0:
+            console.print(f"[dim]Filtered out {tag_filtered} aliases (didn't match tag '{tag}')[/]")
+            
+    except Exception as e:
+        console.print(f"[red]✗[/] Failed to import: {e}")
+
+@tag.command()
+@click.argument("tag_name")
+@click.option("--file", "-f", type=click.Path(), help="Output file path")
+@click.option("--format", type=click.Choice(["json", "yaml"]), default="json", help="Export format")
+def export(tag_name, file, format):
+    """Export all aliases with a specific tag"""
+    aliases = storage.list_all()
+    tagged_aliases = [a for a in aliases if tag_name in a.tags]
+    
+    if not tagged_aliases:
+        console.print(f"[yellow]No aliases found with tag '{tag_name}'[/]")
+        return
+    
+    # Generate filename if not provided
+    if not file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file = f"alix_tag_{tag_name}_{timestamp}.{format}"
+    
+    filepath = Path(file)
+    
+    # Export data
+    export_data = {
+        "version": "1.0",
+        "exported_at": datetime.now().isoformat(),
+        "tag": tag_name,
+        "count": len(tagged_aliases),
+        "aliases": [alias.to_dict() for alias in tagged_aliases]
+    }
+    
+    try:
+        if format == "yaml":
+            import yaml
+            with open(filepath, "w") as f:
+                yaml.dump(export_data, f, default_flow_style=False, sort_keys=False)
+        else:  # json
+            with open(filepath, "w") as f:
+                json.dump(export_data, f, indent=2, default=str)
+        
+        console.print(f"[green]✓[/] Exported {len(tagged_aliases)} aliases with tag '{tag_name}' to {filepath.name}")
+        
+    except Exception as e:
+        console.print(f"[red]✗[/] Export failed: {e}")
+
+@tag.command()
+@click.argument("tags", nargs=-1, required=True)
+@click.option("--file", "-f", type=click.Path(), help="Output file path")
+@click.option("--format", type=click.Choice(["json", "yaml"]), default="json", help="Export format")
+@click.option("--match-all", is_flag=True, help="Match aliases that have ALL tags (default: match ANY)")
+def export_multi(tags, file, format, match_all):
+    """Export aliases matching multiple tags"""
+    if not file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        match_type = "all" if match_all else "any"
+        file = f"alix_tags_{match_type}_{timestamp}.{format}"
+    
+    filepath = Path(file)
+    
+    porter = AliasPorter()
+    success, message = porter.export_by_tags(tags, filepath, format, match_all)
+    
+    if success:
+        console.print(f"[green]✓[/] {message}")
+    else:
+        console.print(f"[red]✗[/] {message}")
+
+@tag.command()
+def stats():
+    """Show comprehensive tag statistics"""
+    porter = AliasPorter()
+    stats = porter.get_tag_statistics()
+    
+    console.print(f"[bold cyan]📊 Tag Statistics[/]")
+    console.print(f"Total tags: {stats['total_tags']}")
+    console.print(f"Total aliases: {stats['total_aliases']}")
+    console.print(f"Tagged aliases: {stats['tagged_aliases']}")
+    console.print(f"Untagged aliases: {stats['untagged_aliases']}")
+    
+    if stats['tag_counts']:
+        console.print(f"\n[bold]Most Used Tags:[/]")
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Tag", style="cyan", width=20)
+        table.add_column("Count", style="yellow", width=10)
+        table.add_column("Percentage", style="green", width=12)
+        
+        for tag, count in list(stats['tag_counts'].items())[:10]:
+            percentage = (count / stats['total_aliases']) * 100
+            table.add_row(tag, str(count), f"{percentage:.1f}%")
+        
+        console.print(table)
+    
+    if stats['tag_combinations']:
+        console.print(f"\n[bold]Most Common Tag Combinations:[/]")
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Tags", style="cyan", width=30)
+        table.add_column("Count", style="yellow", width=10)
+        
+        for combo, count in list(stats['tag_combinations'].items())[:10]:
+            tags_str = " + ".join(combo)
+            table.add_row(tags_str, str(count))
+        
+        console.print(table)
 
 if __name__ == "__main__":
     main()
