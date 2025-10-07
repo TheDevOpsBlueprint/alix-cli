@@ -25,6 +25,9 @@ from alix.clipboard import ClipboardManager
 
 
 class AddAliasModal(ModalScreen[bool]):
+
+    
+
     """Clean modal for adding aliases"""
 
     CSS = """
@@ -493,6 +496,7 @@ class HelpModal(ModalScreen):
 
 
 class AliasManager(App):
+    AUTO_REFRESH_INTERVAL = 10
     """Clean and modern alias manager"""
 
     CSS = """
@@ -683,6 +687,20 @@ class AliasManager(App):
 
         self.refresh_table()
         self.update_status()
+
+        self.set_interval(self.AUTO_REFRESH_INTERVAL, self.auto_refresh)
+
+    
+    def auto_refresh(self) -> None:
+        """Auto-refresh alias table periodically."""
+        self.storage.load()
+        self.refresh_table()
+        self.update_status()
+        # Optionally show timestamp in the status bar
+        now = datetime.now().strftime("%H:%M:%S")
+        self.query_one("#status-bar", Static).update(
+            f"Auto-refreshed at {now} | Total aliases: {len(self.storage.list_all())}"
+        )
 
     def refresh_table(self, search_term: str = "") -> None:
         table = self.query_one("#table", DataTable)

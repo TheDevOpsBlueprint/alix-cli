@@ -21,18 +21,33 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install dependencies
         run: make dev-install
 
+      - name: Install additional tooling (ruff, bandit, pip-audit, pytest-cov)
+        run: |
+          alix-venv/bin/python -m pip install --upgrade pip
+          alix-venv/bin/pip install ruff bandit pip-audit pytest-cov
+
+      - name: Run ruff (lint)
+        run: alix-venv/bin/ruff check .
+
       - name: Run black formatting check
         run: alix-venv/bin/black --check .
-        continue-on-error: true # TODO: Fix formatting issues in separate PR
+        continue-on-error: true 
 
       - name: Run flake8 linting
         run: alix-venv/bin/flake8 .
-        continue-on-error: true # TODO: Fix linting issues in separate P
+        continue-on-error: true 
 
-      - name: Run tests
-        run: alix-venv/bin/pytest --tb=short
-        continue-on-error: true # Don't fail if no tests found TODO: Implement tests and replace this with coverage reporting
+      - name: Run bandit (security scan)
+        run: alix-venv/bin/bandit -r alix -ll -iii
+
+      - name: Run pip-audit (dependency vulnerabilities)
+        run: alix-venv/bin/pip-audit --strict
+
+      - name: Run tests with coverage
+        run: alix-venv/bin/pytest --tb=short --cov=alix --cov-report=term-missing --cov-report=xml
+        continue-on-error: true 
