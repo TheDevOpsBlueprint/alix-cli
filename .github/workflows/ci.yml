@@ -35,4 +35,3 @@ jobs:
 
       - name: Run tests
         run: alix-venv/bin/pytest --tb=short
-        continue-on-error: true # Don't fail if no tests found TODO: Implement tests and replace this with coverage reporting
