@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import ANY, Mock, mock_open, patch
+from unittest.mock import Mock, mock_open, patch, call
 
 from freezegun import freeze_time
 
@@ -7,58 +7,58 @@ from alix.storage import AliasStorage
 
 
 @patch.object(AliasStorage, "load")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_init__default_path(mock_mkdir, mock_load):
     AliasStorage()
 
-    expected_storage_path = Path.home() / ".alix"
-    expected_backup_path = expected_storage_path / "backups"
-
-    mock_mkdir.assert_any_call(expected_storage_path, ANY)
-    mock_mkdir.assert_any_call(expected_backup_path, ANY)
+    mock_mkdir.assert_has_calls([
+        call(exist_ok=True),
+        call(exist_ok=True),
+        call(parents=True, exist_ok=True)
+    ])
     mock_load.assert_called_once()
 
 
 @patch.object(AliasStorage, "load")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_init__custom_path(mock_mkdir, mock_load):
     expected_storage_path = Path("/some/path/file.json")
-    expected_backup_path = Path("/some/path/backups")
 
     AliasStorage(storage_path=expected_storage_path)
 
-    mock_mkdir.assert_any_call(expected_backup_path, ANY)
+    mock_mkdir.assert_has_calls([
+        call(exist_ok=True),
+        call(parents=True, exist_ok=True)
+    ])
     mock_load.assert_called_once()
 
 
 @freeze_time("2025-10-24 21:01:01")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 @patch("alix.storage.shutil")
 def test_create_backup(mock_shutil, mock_mkdir):
     storage = AliasStorage()
     storage.aliases = {"alix-test-echo": "alix test working!"}
 
-    with (
-        patch("pathlib.Path.exists", autospec=True) as mock_exists,
-        patch("pathlib.Path.glob", autospec=True) as mock_glob,
-        patch("pathlib.Path.unlink", autospec=True) as mock_unlink,
-    ):
-        mock_exists.return_value = True
-        mock_glob.return_value = [
-            Path("alias_20251024_200000.json"),
-            Path("alias_20251023_200000.json"),
-            Path("alias_20251022_200000.json"),
-            Path("alias_20251021_200000.json"),
-            Path("alias_20251020_200000.json"),
-            Path("alias_20251019_200000.json"),
-            Path("alias_20251018_200000.json"),
-            Path("alias_20251017_200000.json"),
-            Path("alias_20251016_200000.json"),
-            Path("alias_20251015_200000.json"),
-            Path("alias_20251014_200000.json"),
-        ]
+    with patch("pathlib.Path.exists", autospec=True) as mock_exists:
+        with patch("pathlib.Path.glob", autospec=True) as mock_glob:
+            with patch("pathlib.Path.unlink", autospec=True) as mock_unlink:
+                mock_exists.return_value = True
+                mock_glob.return_value = [
+                    Path("alias_20251024_200000.json"),
+                    Path("alias_20251023_200000.json"),
+                    Path("alias_20251022_200000.json"),
+                    Path("alias_20251021_200000.json"),
+                    Path("alias_20251020_200000.json"),
+                    Path("alias_20251019_200000.json"),
+                    Path("alias_20251018_200000.json"),
+                    Path("alias_20251017_200000.json"),
+                    Path("alias_20251016_200000.json"),
+                    Path("alias_20251015_200000.json"),
+                    Path("alias_20251014_200000.json"),
+                ]
 
-        storage.create_backup()
+                storage.create_backup()
 
     mock_shutil.copy2.assert_called_once_with(
         Path.home() / Path(".alix/aliases.json"),
@@ -67,7 +67,7 @@ def test_create_backup(mock_shutil, mock_mkdir):
     mock_unlink.assert_called_once_with(Path("alias_20251014_200000.json"))
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 @patch("alix.storage.shutil")
 def test_create_backup__no_aliases_file(mock_shutil, mock_mkdir):
     storage = AliasStorage(Path("/tmp/nothing/aliases.json"))
@@ -78,7 +78,7 @@ def test_create_backup__no_aliases_file(mock_shutil, mock_mkdir):
     mock_shutil.copy2.assert_not_called()
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_load(mock_mkdir, storage_file_raw_data, alias):
     storage = AliasStorage()
 
@@ -95,7 +95,7 @@ def test_load(mock_mkdir, storage_file_raw_data, alias):
     assert storage.aliases["alix-test-echo"] == alias
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_load__corrupted_file(mock_mkdir):
     expected_data = '{"alix-test-echo": zzzzzz}'
     mocked_open = mock_open(read_data=expected_data)
@@ -117,7 +117,7 @@ def test_load__corrupted_file(mock_mkdir):
 
 
 @patch("alix.storage.json")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_add(mock_mkdir, mock_json, alias, storage_file_data):
     mocked_open = mock_open()
     mock_backup = Mock()
@@ -137,7 +137,7 @@ def test_add(mock_mkdir, mock_json, alias, storage_file_data):
 
 
 @patch("alix.storage.json")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_add__alias_exists(mock_mkdir, mock_json, alias):
     mock_backup = Mock()
 
@@ -154,7 +154,7 @@ def test_add__alias_exists(mock_mkdir, mock_json, alias):
 
 
 @patch("alix.storage.json")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_remove(mock_mkdir, mock_json, alias):
     mocked_open = mock_open()
     mock_backup = Mock()
@@ -173,7 +173,7 @@ def test_remove(mock_mkdir, mock_json, alias):
 
 
 @patch("alix.storage.json")
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_remove__alias_absent(mock_mkdir, mock_json, alias):
     mock_backup = Mock()
 
@@ -188,7 +188,7 @@ def test_remove__alias_absent(mock_mkdir, mock_json, alias):
     mock_json.dump.assert_not_called()
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_get(mock_mkdir, alias):
     storage = AliasStorage()
     storage.aliases[alias.name] = alias
@@ -196,7 +196,7 @@ def test_get(mock_mkdir, alias):
     assert storage.get(alias.name) == alias
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 def test_list_all(mock_mkdir, alias_list):
     storage = AliasStorage()
     storage.aliases.clear()  # Clear any loaded aliases for test isolation
@@ -208,7 +208,7 @@ def test_list_all(mock_mkdir, alias_list):
     assert list_all[1] == alias_list[1]
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 @patch("alix.storage.shutil")
 def test_restore_latest_backup(mock_shutil, mock_mkdir):
     with patch("pathlib.Path.glob", autospec=True) as mock_glob:
@@ -231,7 +231,7 @@ def test_restore_latest_backup(mock_shutil, mock_mkdir):
     )
 
 
-@patch("os.mkdir")
+@patch("alix.storage.Path.mkdir")
 @patch("alix.storage.shutil")
 def test_restore_latest_backup__no_backups(mock_shutil, mock_mkdir):
     with patch("pathlib.Path.glob", autospec=True) as mock_glob:
