@@ -1,7 +1,7 @@
 import re
 from difflib import SequenceMatcher
 
-from typing import Any, Literal
+from typing import Any, List, Literal, Union
 
 from rich.table import Table
 from rich.console import Console
@@ -9,17 +9,17 @@ from rich.text import Text
 from rich import box
 
 class Render:
-    def _split_keep_ws(self, s: str) -> list[str | Any]:
+    def _split_keep_ws(self, s: str) -> List[Union[str, Any]]:
         return re.split(r'(\s+)', s)
 
     def _word_level_text(self, left: str, right: str, side: Literal["left", "right"]) -> Text:
         """
         Give color-coded output for additions/deletions using rich.Text,
-        with token highlight base on the left vs right comparison. 
+        with token highlight base on the left vs right comparison.
         """
         if side not in ("left", "right"):
             raise ValueError("side must be 'left' or 'right'")
-        
+
         left_tokens = self._split_keep_ws(left)
         right_tokens = self._split_keep_ws(right)
         sm = SequenceMatcher(None, left_tokens, right_tokens)

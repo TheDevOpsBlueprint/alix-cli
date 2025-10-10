@@ -2,7 +2,7 @@ import json
 import yaml
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from alix.models import Alias
 from alix.storage import AliasStorage
@@ -18,7 +18,7 @@ class AliasPorter:
         """Export aliases to a dictionary format"""
         if aliases is None:
             aliases = self.storage.list_all()
-        
+
         # Apply tag filter if specified
         if tag_filter:
             aliases = [alias for alias in aliases if tag_filter in alias.tags]
@@ -29,13 +29,13 @@ class AliasPorter:
             "count": len(aliases),
             "aliases": [alias.to_dict() for alias in aliases],
         }
-        
+
         if tag_filter:
             export_data["tag_filter"] = tag_filter
-            
+
         return export_data
 
-    def export_to_file(self, filepath: Path, format: str = "json", tag_filter: str = None) -> tuple[bool, str]:
+    def export_to_file(self, filepath: Path, format: str = "json", tag_filter: str = None) -> Tuple[bool, str]:
         """Export aliases to a file"""
         data = self.export_to_dict(tag_filter=tag_filter)
 
@@ -54,7 +54,7 @@ class AliasPorter:
         except Exception as e:
             return False, f"Export failed: {str(e)}"
 
-    def import_from_file(self, filepath: Path, merge: bool = False, tag_filter: str = None) -> tuple[bool, str]:
+    def import_from_file(self, filepath: Path, merge: bool = False, tag_filter: str = None) -> Tuple[bool, str]:
         """Import aliases from a file"""
         if not filepath.exists():
             return False, f"File not found: {filepath}"
@@ -75,12 +75,12 @@ class AliasPorter:
 
             for alias_data in data["aliases"]:
                 alias = Alias.from_dict(alias_data)
-                
+
                 # Apply tag filter if specified
                 if tag_filter and tag_filter not in alias.tags:
                     tag_filtered += 1
                     continue
-                
+
                 if merge or alias.name not in self.storage.aliases:
                     self.storage.aliases[alias.name] = alias
                     imported += 1
@@ -100,20 +100,20 @@ class AliasPorter:
         except Exception as e:
             return False, f"Import failed: {str(e)}"
 
-    def export_by_tags(self, tags: List[str], filepath: Path, format: str = "json", match_all: bool = False) -> tuple[bool, str]:
+    def export_by_tags(self, tags: List[str], filepath: Path, format: str = "json", match_all: bool = False) -> Tuple[bool, str]:
         """Export aliases that match any (or all) of the specified tags"""
         aliases = self.storage.list_all()
-        
+
         if match_all:
             # Match aliases that have ALL specified tags
             filtered_aliases = [alias for alias in aliases if all(tag in alias.tags for tag in tags)]
         else:
             # Match aliases that have ANY of the specified tags
             filtered_aliases = [alias for alias in aliases if any(tag in alias.tags for tag in tags)]
-        
+
         if not filtered_aliases:
             return False, f"No aliases found matching tags: {', '.join(tags)}"
-        
+
         export_data = {
             "version": "1.0",
             "exported_at": datetime.now().isoformat(),
@@ -122,7 +122,7 @@ class AliasPorter:
             "count": len(filtered_aliases),
             "aliases": [alias.to_dict() for alias in filtered_aliases]
         }
-        
+
         try:
             if format == "yaml":
                 with open(filepath, "w") as f:
@@ -142,19 +142,19 @@ class AliasPorter:
         aliases = self.storage.list_all()
         tag_counts = {}
         tag_combinations = {}
-        
+
         for alias in aliases:
             # Count individual tags
             for tag in alias.tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
-            
+
             # Count tag combinations (pairs)
             if len(alias.tags) >= 2:
                 for i, tag1 in enumerate(alias.tags):
                     for tag2 in alias.tags[i+1:]:
                         combo = tuple(sorted([tag1, tag2]))
                         tag_combinations[combo] = tag_combinations.get(combo, 0) + 1
-        
+
         return {
             "total_tags": len(tag_counts),
             "total_aliases": len(aliases),
