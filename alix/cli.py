@@ -1,26 +1,24 @@
-import click
+import json
 import subprocess
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import click
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
-from rich.prompt import Confirm
-from rich.markdown import Markdown
 
 from alix import __version__
-from alix.models import Alias
-from alix.storage import AliasStorage
-from alix.shell_integrator import ShellIntegrator
-from alix.shell_detector import ShellType
-from alix.scanner import AliasScanner
-from alix.porter import AliasPorter
 from alix.config import Config
-from alix.history_manager import HistoryManager
-from click.shell_completion import shell_complete as _click_shell_complete
-from alix.shell_wrapper import ShellWrapper
-import json
+from alix.models import Alias
+from alix.porter import AliasPorter
 from alix.render import Render
+from alix.scanner import AliasScanner
+from alix.shell_detector import ShellType
+from alix.shell_integrator import ShellIntegrator
+from alix.shell_wrapper import ShellWrapper
+from alix.storage import AliasStorage
 from alix.template_manager import TemplateManager
 
 console = Console()
@@ -67,7 +65,10 @@ def add(name, command, description, tags, no_apply, force):
                 "bash",
                 "-i",
                 "-c",
-                f"(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot {name}",
+                (
+                    "(alias; declare -f) | /usr/bin/which --tty-only --read-alias "
+                    f"--read-functions --show-tilde --show-dot {name}"
+                ),
             ],
             capture_output=True,
             text=True,
@@ -102,7 +103,7 @@ def add(name, command, description, tags, no_apply, force):
                 console.print(f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]")
             else:
                 console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
-                console.print(f"[dim]   Run 'alix apply' to apply all aliases to shell[/]")
+                console.print("[dim]   Run 'alix apply' to apply all aliases to shell[/]")
     else:
         console.print(f"[red]✗[/] Alias '{name}' already exists in alix!\nEdit the alias to override it")
 
@@ -114,7 +115,6 @@ def add(name, command, description, tags, no_apply, force):
 @click.option("--no-apply", is_flag=True, help="Don't apply to shell immediately")
 def edit(name, command, description, no_apply):
     """Add a new alias to your collection and apply it immediately"""
-    msg = None
 
     alias = storage.get(name)
     if alias is None:
@@ -164,7 +164,7 @@ def edit(name, command, description, no_apply):
                 console.print(f"[dim]   For current session, run: source ~/{integrator.get_target_file().name}[/]")
             else:
                 console.print(f"[yellow]⚠[/] Alias saved but not applied: {message}")
-                console.print(f"[dim]   Run 'alix apply' to apply all aliases to shell[/]")
+                console.print("[dim]   Run 'alix apply' to apply all aliases to shell[/]")
 
 
 @main.command()
@@ -255,7 +255,6 @@ def completion(shell, install):
         return
 
     # FIXED: Updated to use Click 8.x shell completion API
-    instruction = f"{target_shell}_source"
     complete_var = "_ALIX_COMPLETE"
 
     # Get the shell completion script
@@ -337,9 +336,9 @@ def apply(shell, file, install_completions, dry_run):
     if success:
         console.print(f"[green]✔[/] {message}")
         console.print("\n[bold]Next steps:[/]")
-        console.print(f"  1. Restart your terminal, OR")
+        console.print("  1. Restart your terminal, OR")
         console.print(f"  2. Run: [cyan]source {target_file}[/]")
-        console.print(f"\n[dim]Your aliases are now ready to use![/]")
+        console.print("\n[dim]Your aliases are now ready to use![/]")
     else:
         console.print(f"[red]✗[/] {message}")
         return
@@ -423,7 +422,7 @@ def stats(detailed, export):
 
         # Recently used aliases
         if analytics["recently_used"]:
-            console.print(f"\n[green]🔥 Recently Used (7 days):[/]")
+            console.print("\n[green]🔥 Recently Used (7 days):[/]")
             for alias_name in analytics["recently_used"][:10]:  # Show first 10
                 alias = storage.get(alias_name)
                 if alias:
@@ -431,7 +430,7 @@ def stats(detailed, export):
 
         # Most productive aliases
         if analytics["most_productive_aliases"]:
-            console.print(f"\n[bold]💪 Most Productive Aliases:[/]")
+            console.print("\n[bold]💪 Most Productive Aliases:[/]")
             table = Table(show_header=True, header_style="bold cyan")
             table.add_column("Rank", style="dim", width=6)
             table.add_column("Alias", style="cyan")
@@ -446,13 +445,13 @@ def stats(detailed, export):
 
         # Usage trends (last 7 days)
         if analytics["usage_trends"]:
-            console.print(f"\n[bold]📅 Usage Trends (Last 7 Days):[/]")
+            console.print("\n[bold]📅 Usage Trends (Last 7 Days):[/]")
             recent_days = sorted(analytics["usage_trends"].items(), reverse=True)[:7]
             for date, count in recent_days:
                 console.print(f"  {date}: {count} uses")
 
     # Show top 5 space savers
-    console.print(f"\n[bold]🏆 Top Commands by Length Saved:[/]")
+    console.print("\n[bold]🏆 Top Commands by Length Saved:[/]")
     sorted_aliases = sorted(aliases, key=lambda a: len(a.command) - len(a.name), reverse=True)[:5]
 
     sorted_aliases = sorted(aliases, key=lambda a: len(a.command) - len(a.name), reverse=True)[:5]
@@ -706,7 +705,7 @@ def history(days, alias):
             total_recent_usage = sum(count for _, count in recent_days)
             console.print(f"Total usage in last {days} days: {total_recent_usage}")
 
-            console.print(f"\n[bold]Daily Breakdown:[/]")
+            console.print("\n[bold]Daily Breakdown:[/]")
             for date, count in recent_days:
                 console.print(f"  {date}: {count} uses")
         else:
@@ -750,7 +749,7 @@ def setup_tracking(shell, file, standalone, output):
             console.print(f"[green]✔[/] Standalone tracking script created: [cyan]{output}[/]")
             console.print(f"[dim]To use: source {output}[/]")
         else:
-            console.print(f"[red]✗[/] Failed to create tracking script")
+            console.print("[red]✗[/] Failed to create tracking script")
     else:
         # Install into shell config
         if file:
@@ -768,7 +767,7 @@ def setup_tracking(shell, file, standalone, output):
             console.print(f"[green]✔[/] Usage tracking installed in: [cyan]{config_file}[/]")
             console.print(f"[dim]Restart your shell or run: source {config_file}[/]")
         else:
-            console.print(f"[red]✗[/] Failed to install tracking integration")
+            console.print("[red]✗[/] Failed to install tracking integration")
 
 
 @main.command()
@@ -837,7 +836,7 @@ def list_aliases():
             table.add_row(alias.name, alias.command, tags_str)
 
     console.print(table)
-    console.print(f"\n[dim]💡 Tip: Run 'alix' for interactive mode![/]")
+    console.print("\n[dim]💡 Tip: Run 'alix' for interactive mode![/]")
 
 
 @main.group()
@@ -846,9 +845,9 @@ def group():
     pass
 
 
-@group.command()
+@group.command("create")
 @click.option("--name", "-n", prompt=True, help="Group name")
-def create(name):
+def create_group(name):
     """Create a new group (shows existing aliases that can be assigned)"""
     aliases = storage.list_all()
     ungrouped_aliases = [a for a in aliases if not a.group]
@@ -861,7 +860,7 @@ def create(name):
     console.print(f"[dim]Found {len(ungrouped_aliases)} ungrouped aliases[/]")
 
     # Show ungrouped aliases
-    table = Table(title=f"Ungrouped Aliases")
+    table = Table(title="Ungrouped Aliases")
     table.add_column("Name", style="cyan")
     table.add_column("Command", style="white")
     table.add_column("Description", style="dim")
@@ -877,8 +876,8 @@ def create(name):
     console.print(f"\n[dim]💡 Use 'alix group add {name} <alias_name>' to add aliases to this group[/]")
 
 
-@group.command()
-def list():
+@group.command("list")
+def list_group():
     """List all groups and their aliases"""
     aliases = storage.list_all()
     groups = {}
@@ -912,10 +911,10 @@ def list():
         console.print(table)
 
 
-@group.command()
+@group.command("add")
 @click.argument("group_name")
 @click.argument("alias_name")
-def add(group_name, alias_name):
+def add_group(group_name, alias_name):
     """Add an alias to a group"""
     alias = storage.get(alias_name)
     if not alias:
@@ -946,10 +945,10 @@ def add(group_name, alias_name):
     console.print(f"[green]✔[/] Added '{alias_name}' to group '{group_name}'")
 
 
-@group.command()
+@group.command("remove")
 @click.argument("group_name")
 @click.argument("alias_name")
-def remove(group_name, alias_name):
+def remove_group(group_name, alias_name):
     """Remove an alias from a group"""
     alias = storage.get(alias_name)
     if not alias:
@@ -979,11 +978,11 @@ def remove(group_name, alias_name):
     console.print(f"[green]✔[/] Removed '{alias_name}' from group '{group_name}'")
 
 
-@group.command()
+@group.command("delete")
 @click.argument("group_name")
 @click.option("--reassign", help="Reassign aliases to this group instead of deleting")
 @click.confirmation_option(prompt="Are you sure you want to delete this group?")
-def delete(group_name, reassign):
+def delete_group(group_name, reassign):
     """Delete a group and optionally reassign aliases"""
     aliases = storage.list_all()
     group_aliases = [a for a in aliases if a.group == group_name]
@@ -1035,7 +1034,7 @@ def delete(group_name, reassign):
         console.print(f"[green]✔[/] Removed group '{group_name}' from {len(group_aliases)} aliases")
 
 
-@group.command()
+@group.command("import")
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--group", "-g", help="Import to specific group (overrides file group)")
 def import_group(file, group):
@@ -1045,7 +1044,7 @@ def import_group(file, group):
             data = json.load(f)
 
         if "aliases" not in data:
-            console.print(f"[red]✗[/] Invalid group export file")
+            console.print("[red]✗[/] Invalid group export file")
             return
 
         target_group = group or data.get("group", "imported")
@@ -1084,10 +1083,10 @@ def import_group(file, group):
         console.print(f"[red]✗[/] Failed to import: {e}")
 
 
-@group.command()
+@group.command("apply")
 @click.argument("group_name")
 @click.option("--apply", is_flag=True, help="Apply all aliases in group to shell")
-def apply(group_name, apply):
+def apply_group(group_name, apply):
     """Apply all aliases in a group to shell"""
     aliases = storage.list_all()
     group_aliases = [a for a in aliases if a.group == group_name]
@@ -1123,8 +1122,8 @@ def tag():
     pass
 
 
-@tag.command()
-def list():
+@tag.command("list")
+def list_tag():
     """List all tags and their usage"""
     aliases = storage.list_all()
     tag_counts = {}
@@ -1157,9 +1156,9 @@ def list():
     console.print(table)
 
 
-@tag.command()
+@tag.command("show")
 @click.argument("tag_name")
-def show(tag_name):
+def show_tag(tag_name):
     """Show all aliases with a specific tag"""
     aliases = storage.list_all()
     tagged_aliases = [a for a in aliases if tag_name in a.tags]
@@ -1188,10 +1187,10 @@ def show(tag_name):
     console.print(table)
 
 
-@tag.command()
+@tag.command("add")
 @click.argument("alias_name")
 @click.argument("tags", nargs=-1, required=True)
-def add(alias_name, tags):
+def add_tag(alias_name, tags):
     """Add tags to an alias"""
     alias = storage.get(alias_name)
     if not alias:
@@ -1227,10 +1226,10 @@ def add(alias_name, tags):
         console.print(f"[yellow]⚠[/] All specified tags already exist for '{alias_name}'")
 
 
-@tag.command()
+@tag.command("remove")
 @click.argument("alias_name")
 @click.argument("tags", nargs=-1, required=True)
-def remove(alias_name, tags):
+def remove_tag(alias_name, tags):
     """Remove tags from an alias"""
     alias = storage.get(alias_name)
     if not alias:
@@ -1264,16 +1263,16 @@ def remove(alias_name, tags):
         if alias.tags:
             console.print(f"[dim]Remaining tags: {', '.join(alias.tags)}[/]")
         else:
-            console.print(f"[dim]No tags remaining[/]")
+            console.print("[dim]No tags remaining[/]")
     else:
         console.print(f"[yellow]⚠[/] None of the specified tags exist for '{alias_name}'")
 
 
-@tag.command()
+@tag.command("rename")
 @click.argument("old_tag")
 @click.argument("new_tag")
 @click.option("--dry-run", is_flag=True, help="Show what would be changed without making changes")
-def rename(old_tag, new_tag, dry_run):
+def rename_tag(old_tag, new_tag, dry_run):
     """Rename a tag across all aliases"""
     aliases = storage.list_all()
     affected_aliases = [a for a in aliases if old_tag in a.tags]
@@ -1321,10 +1320,10 @@ def rename(old_tag, new_tag, dry_run):
     console.print(f"[green]✓[/] Renamed tag in {updated_count} aliases")
 
 
-@tag.command()
+@tag.command("delete")
 @click.argument("tag_name")
 @click.option("--dry-run", is_flag=True, help="Show what would be changed without making changes")
-def delete(tag_name, dry_run):
+def delete_tag(tag_name, dry_run):
     """Delete a tag from all aliases"""
     aliases = storage.list_all()
     affected_aliases = [a for a in aliases if tag_name in a.tags]
@@ -1380,7 +1379,7 @@ def import_tag(file, tag):
             data = json.load(f)
 
         if "aliases" not in data:
-            console.print(f"[red]✗[/] Invalid export file")
+            console.print("[red]✗[/] Invalid export file")
             return
 
         imported = 0
@@ -1413,11 +1412,11 @@ def import_tag(file, tag):
         console.print(f"[red]✗[/] Failed to import: {e}")
 
 
-@tag.command()
+@tag.command("export")
 @click.argument("tag_name")
 @click.option("--file", "-f", type=click.Path(), help="Output file path")
 @click.option("--format", type=click.Choice(["json", "yaml"]), default="json", help="Export format")
-def export(tag_name, file, format):
+def export_tag(tag_name, file, format):
     """Export all aliases with a specific tag"""
     aliases = storage.list_all()
     tagged_aliases = [a for a in aliases if tag_name in a.tags]
@@ -1481,20 +1480,20 @@ def export_multi(tags, file, format, match_all):
         console.print(f"[red]✗[/] {message}")
 
 
-@tag.command()
-def stats():
+@tag.command("stats")
+def stats_tag():
     """Show comprehensive tag statistics"""
     porter = AliasPorter()
     stats = porter.get_tag_statistics()
 
-    console.print(f"[bold cyan]📊 Tag Statistics[/]")
+    console.print("[bold cyan]📊 Tag Statistics[/]")
     console.print(f"Total tags: {stats['total_tags']}")
     console.print(f"Total aliases: {stats['total_aliases']}")
     console.print(f"Tagged aliases: {stats['tagged_aliases']}")
     console.print(f"Untagged aliases: {stats['untagged_aliases']}")
 
     if stats["tag_counts"]:
-        console.print(f"\n[bold]Most Used Tags:[/]")
+        console.print("\n[bold]Most Used Tags:[/]")
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Tag", style="cyan", width=20)
         table.add_column("Count", style="yellow", width=10)
@@ -1507,7 +1506,7 @@ def stats():
         console.print(table)
 
     if stats["tag_combinations"]:
-        console.print(f"\n[bold]Most Common Tag Combinations:[/]")
+        console.print("\n[bold]Most Common Tag Combinations:[/]")
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Tags", style="cyan", width=30)
         table.add_column("Count", style="yellow", width=10)
@@ -1535,15 +1534,15 @@ def templates():
     pass
 
 
-@templates.command()
-def list():
+@templates.command("list")
+def list_templates():
     """List available templates"""
     template_manager = TemplateManager()
 
     # Show categories first
     categories = template_manager.get_categories()
     if categories:
-        console.print(f"[bold cyan]📋 Available Categories:[/]")
+        console.print("[bold cyan]📋 Available Categories:[/]")
         for category in categories:
             templates = template_manager.list_templates(category)
             console.print(f"  [bold]{category}[/] ({len(templates)} templates)")
@@ -1572,7 +1571,7 @@ def list():
         )
 
     console.print(table)
-    console.print(f"\n[dim]💡 Use 'alix templates add <template>' to import a template[/]")
+    console.print("\n[dim]💡 Use 'alix templates add <template>' to import a template[/]")
 
 
 @templates.command(name="add")
@@ -1629,7 +1628,7 @@ def add_template(template_name, aliases, dry_run):
 
     if success:
         console.print(f"[green]✔[/] {message}")
-        console.print(f"\n[dim]💡 Run 'alix apply' to add these to your shell config[/]")
+        console.print("\n[dim]💡 Run 'alix apply' to add these to your shell config[/]")
     else:
         console.print(f"[red]✗[/] {message}")
 
@@ -1664,7 +1663,7 @@ def add_category(category, aliases, dry_run):
         if alias_names:
             console.print(f"[dim]Filtered aliases: {len(alias_names)}[/]")
 
-        console.print(f"\n[bold]Templates in category:[/]")
+        console.print("\n[bold]Templates in category:[/]")
         for template in templates:
             console.print(f"  • [cyan]{template.name}[/] - {template.description} ({len(template.aliases)} aliases)")
         return
@@ -1674,7 +1673,7 @@ def add_category(category, aliases, dry_run):
 
     if success:
         console.print(f"[green]✔[/] {message}")
-        console.print(f"\n[dim]💡 Run 'alix apply' to add these to your shell config[/]")
+        console.print("\n[dim]💡 Run 'alix apply' to add these to your shell config[/]")
     else:
         console.print(f"[red]✗[/] {message}")
 

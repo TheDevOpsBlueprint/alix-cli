@@ -20,17 +20,7 @@ def test_cli_add(mock_storage, mock_subprocess, mock_apply, alias):
     runner = CliRunner()
     result = runner.invoke(
         main,
-        [
-            "add",
-            "-n",
-            "alix-test-echo",
-            "-c",
-            "alix test working!",
-            "-d",
-            "alix test shortcut",
-            "--tags",
-            "a, b"
-        ],
+        ["add", "-n", "alix-test-echo", "-c", "alix test working!", "-d", "alix test shortcut", "--tags", "a, b"],
     )
 
     assert result.exit_code == 0
@@ -40,10 +30,7 @@ def test_cli_add(mock_storage, mock_subprocess, mock_apply, alias):
     mock_storage.add.assert_called_with(alias, record_history=True)
 
     assert "✔ Added alias: alix-test-echo = 'alix test working!'" in result.output
-    assert (
-        "💡 Alias 'alix-test-echo' is now available in new shell sessions"
-        in result.output
-    )
+    assert "💡 Alias 'alix-test-echo' is now available in new shell sessions" in result.output
     assert "For current session, run: source" in result.output
 
 
@@ -118,17 +105,7 @@ def test_cli_add__apply_failed(mock_storage, mock_apply, alias):
     runner = CliRunner()
     result = runner.invoke(
         main,
-        [
-            "add",
-            "-n",
-            "alix-test-echo",
-            "-c",
-            "alix test working!",
-            "-d",
-            "alix test shortcut",
-            "--tags",
-            "a, b"
-        ],
+        ["add", "-n", "alix-test-echo", "-c", "alix test working!", "-d", "alix test shortcut", "--tags", "a, b"],
     )
 
     assert result.exit_code == 0
@@ -136,10 +113,7 @@ def test_cli_add__apply_failed(mock_storage, mock_apply, alias):
     mock_apply.assert_called_with(alias)
 
     assert "Added alias: alix-test-echo = 'alix test working!'" in result.output
-    assert (
-        "⚠ Alias saved but not applied: No shell configuration file found"
-        in result.output
-    )
+    assert "⚠ Alias saved but not applied: No shell configuration file found" in result.output
     assert "   Run 'alix apply' to apply all aliases to shell" in result.output
 
     assert "✓ Applied alias 'alix-test-echo' to" not in result.output
@@ -166,7 +140,7 @@ def test_cli_add__no_apply(mock_storage, mock_apply, alias):
             "-d",
             "alix test shortcut",
             "--tags",
-            "a, b"
+            "a, b",
         ],
     )
 
@@ -177,7 +151,4 @@ def test_cli_add__no_apply(mock_storage, mock_apply, alias):
 
     assert "Added alias: alix-test-echo = 'alix test working!'" in result.output
     assert "✓ Applied alias 'alix-test-echo' to" not in result.output
-    assert (
-        "⚠ Alias saved but not applied: alix-test-echo = 'alix test working!'"
-        not in result.output
-    )
+    assert "⚠ Alias saved but not applied: alix-test-echo = 'alix test working!'" not in result.output

@@ -1,8 +1,9 @@
 import json
-import yaml
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import yaml
 
 from alix.models import Alias
 from alix.storage import AliasStorage
@@ -100,7 +101,9 @@ class AliasPorter:
         except Exception as e:
             return False, f"Import failed: {str(e)}"
 
-    def export_by_tags(self, tags: List[str], filepath: Path, format: str = "json", match_all: bool = False) -> Tuple[bool, str]:
+    def export_by_tags(
+        self, tags: List[str], filepath: Path, format: str = "json", match_all: bool = False
+    ) -> Tuple[bool, str]:
         """Export aliases that match any (or all) of the specified tags"""
         aliases = self.storage.list_all()
 
@@ -120,7 +123,7 @@ class AliasPorter:
             "tags": tags,
             "match_all": match_all,
             "count": len(filtered_aliases),
-            "aliases": [alias.to_dict() for alias in filtered_aliases]
+            "aliases": [alias.to_dict() for alias in filtered_aliases],
         }
 
         try:
@@ -151,7 +154,7 @@ class AliasPorter:
             # Count tag combinations (pairs)
             if len(alias.tags) >= 2:
                 for i, tag1 in enumerate(alias.tags):
-                    for tag2 in alias.tags[i+1:]:
+                    for tag2 in alias.tags[i + 1 :]:
                         combo = tuple(sorted([tag1, tag2]))
                         tag_combinations[combo] = tag_combinations.get(combo, 0) + 1
 
@@ -161,5 +164,5 @@ class AliasPorter:
             "tagged_aliases": len([a for a in aliases if a.tags]),
             "untagged_aliases": len([a for a in aliases if not a.tags]),
             "tag_counts": dict(sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)),
-            "tag_combinations": dict(sorted(tag_combinations.items(), key=lambda x: x[1], reverse=True))
+            "tag_combinations": dict(sorted(tag_combinations.items(), key=lambda x: x[1], reverse=True)),
         }

@@ -3,7 +3,7 @@
 import re
 import subprocess
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 from alix.models import Alias
 from alix.shell_detector import ShellDetector, ShellType

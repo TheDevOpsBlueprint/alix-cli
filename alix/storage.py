@@ -1,12 +1,12 @@
 import json
 import shutil
-from pathlib import Path
-from typing import List, Optional, Dict
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
 
-from alix.models import Alias, TEST_ALIAS_NAME
-from alix.usage_tracker import UsageTracker
 from alix.history_manager import HistoryManager
+from alix.models import TEST_ALIAS_NAME, Alias
+from alix.usage_tracker import UsageTracker
 
 
 class AliasStorage:
@@ -60,10 +60,7 @@ class AliasStorage:
             try:
                 with open(self.storage_path, "r") as f:
                     data = json.load(f)
-                    self.aliases = {
-                        name: Alias.from_dict(alias_data)
-                        for name, alias_data in data.items()
-                    }
+                    self.aliases = {name: Alias.from_dict(alias_data) for name, alias_data in data.items()}
             except (json.JSONDecodeError, Exception):
                 # If file is corrupted, start fresh but backup old file
                 backup_path = self.storage_path.with_suffix(".corrupted")
@@ -150,7 +147,7 @@ class AliasStorage:
             "recently_used": analytics.recently_used,
             "usage_trends": analytics.usage_trends,
             "average_usage_per_alias": analytics.average_usage_per_alias,
-            "most_productive_aliases": analytics.most_productive_aliases
+            "most_productive_aliases": analytics.most_productive_aliases,
         }
 
     def get_by_group(self, group_name: str) -> List[Alias]:
@@ -202,4 +199,3 @@ class AliasStorage:
             for tag in alias.tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
         return tag_counts
-

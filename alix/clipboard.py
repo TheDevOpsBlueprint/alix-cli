@@ -1,5 +1,5 @@
-import subprocess
 import platform
+import subprocess
 from abc import ABC, abstractmethod
 
 try:

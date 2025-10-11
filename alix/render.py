@@ -1,16 +1,16 @@
 import re
 from difflib import SequenceMatcher
-
 from typing import Any, List, Literal, Union
 
-from rich.table import Table
-from rich.console import Console
-from rich.text import Text
 from rich import box
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
+
 
 class Render:
     def _split_keep_ws(self, s: str) -> List[Union[str, Any]]:
-        return re.split(r'(\s+)', s)
+        return re.split(r"(\s+)", s)
 
     def _word_level_text(self, left: str, right: str, side: Literal["left", "right"]) -> Text:
         """
@@ -52,12 +52,12 @@ class Render:
 
         table = Table(show_header=True, header_style="bold cyan", expand=True, box=box.ROUNDED)
         table.add_column("Current Config", overflow="fold", justify="center")
-        table.add_column("Purpose Config", overflow="fold", justify='center')
+        table.add_column("Purpose Config", overflow="fold", justify="center")
 
         for tag, i1, i2, j1, j2 in sm.get_opcodes():
             if tag == "equal":
                 for a_i, b_j in zip(range(i1, i2), range(j1, j2)):
-                    table.add_row(Text(old_lines[a_i], justify='left'), Text(new_lines[b_j], justify='left'))
+                    table.add_row(Text(old_lines[a_i], justify="left"), Text(new_lines[b_j], justify="left"))
             elif tag == "replace":
                 n = max(i2 - i1, j2 - j1)
                 for k in range(n):
@@ -68,7 +68,7 @@ class Render:
                     table.add_row(left_txt, right_txt)
             elif tag == "delete":
                 for a_i in range(i1, i2):
-                    table.add_row(Text(old_lines[a_i], style="bold red", justify='left'), Text(""))
+                    table.add_row(Text(old_lines[a_i], style="bold red", justify="left"), Text(""))
             elif tag == "insert":
                 for b_j in range(j1, j2):
                     table.add_row(Text(""), Text(new_lines[b_j], style="bold green", justify="left"))

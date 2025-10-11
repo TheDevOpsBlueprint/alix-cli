@@ -1,12 +1,12 @@
 """Shell detection and configuration file handling"""
 
 import os
-import sys
-import subprocess
 import pwd
-from pathlib import Path
-from typing import Optional, Dict
+import subprocess
+import sys
 from enum import Enum
+from pathlib import Path
+from typing import Dict, Optional
 
 
 class ShellType(Enum):
@@ -45,9 +45,7 @@ class ShellDetector:
                 return ShellType.BASH
             elif "fish" in shell_env:
                 return ShellType.FISH
-            elif (
-                "sh" in shell_env and "bash" not in shell_env and "zsh" not in shell_env
-            ):
+            elif "sh" in shell_env and "bash" not in shell_env and "zsh" not in shell_env:
                 return ShellType.SH
 
         # Method 2: Check /etc/passwd for user's default shell (reliable fallback)
@@ -176,9 +174,7 @@ class ShellDetector:
 
         return None
 
-    def find_config_files(
-        self, shell_type: Optional[ShellType] = None
-    ) -> Dict[str, Path]:
+    def find_config_files(self, shell_type: Optional[ShellType] = None) -> Dict[str, Path]:
         """Find existing configuration files for shell"""
         if shell_type is None:
             shell_type = self.detect_current_shell()

@@ -1,6 +1,6 @@
 import yaml
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 from alix.models import Alias
@@ -10,6 +10,7 @@ from alix.storage import AliasStorage
 @dataclass
 class Template:
     """Represents a template with metadata and aliases"""
+
     name: str
     category: str
     description: str
@@ -72,7 +73,7 @@ class TemplateManager:
                         name=alias_data["name"],
                         command=alias_data["command"],
                         description=alias_data.get("description", ""),
-                        tags=alias_data.get("tags", [])
+                        tags=alias_data.get("tags", []),
                     )
                     aliases.append(alias)
 
@@ -81,12 +82,12 @@ class TemplateManager:
                     category=data.get("category", "general"),
                     description=data.get("description", ""),
                     aliases=aliases,
-                    version=data.get("version", "1.0")
+                    version=data.get("version", "1.0"),
                 )
 
                 self._templates[template_name] = template
 
-            except Exception as e:
+            except Exception:
                 # Skip malformed templates
                 continue
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import Mock, mock_open, patch, call
+from unittest.mock import Mock, call, mock_open, patch
 
 from freezegun import freeze_time
 
@@ -12,11 +12,7 @@ from alix.models import Alias
 def test_init__default_path(mock_mkdir, mock_load):
     AliasStorage()
 
-    mock_mkdir.assert_has_calls([
-        call(exist_ok=True),
-        call(exist_ok=True),
-        call(parents=True, exist_ok=True)
-    ])
+    mock_mkdir.assert_has_calls([call(exist_ok=True), call(exist_ok=True), call(parents=True, exist_ok=True)])
     mock_load.assert_called_once()
 
 
@@ -27,10 +23,7 @@ def test_init__custom_path(mock_mkdir, mock_load):
 
     AliasStorage(storage_path=expected_storage_path)
 
-    mock_mkdir.assert_has_calls([
-        call(exist_ok=True),
-        call(parents=True, exist_ok=True)
-    ])
+    mock_mkdir.assert_has_calls([call(exist_ok=True), call(parents=True, exist_ok=True)])
     mock_load.assert_called_once()
 
 
@@ -82,9 +75,7 @@ def test_load(storage_file_raw_data, alias):
     storage = AliasStorage()
 
     mocked_open = mock_open(read_data=storage_file_raw_data)
-    with patch("alix.storage.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.storage.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = True
 
         storage.load()
@@ -100,9 +91,11 @@ def test_load__corrupted_file():
 
     storage = AliasStorage()
 
-    with patch("alix.storage.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists, patch("pathlib.Path.rename", autospec=True) as mock_rename:
+    with (
+        patch("alix.storage.open", mocked_open),
+        patch("pathlib.Path.exists", autospec=True) as mock_exists,
+        patch("pathlib.Path.rename", autospec=True) as mock_rename,
+    ):
         mock_exists.return_value = True
 
         storage.load()
@@ -128,9 +121,7 @@ def test_add(mock_json, alias, storage_file_data):
     assert result is True
     assert storage.aliases["alix-test-echo"] == alias
     mock_backup.assert_called_once()
-    mock_json.dump.assert_called_once_with(
-        storage_file_data, mocked_open(), indent=2, default=str
-    )
+    mock_json.dump.assert_called_once_with(storage_file_data, mocked_open(), indent=2, default=str)
 
 
 @patch("alix.storage.json")

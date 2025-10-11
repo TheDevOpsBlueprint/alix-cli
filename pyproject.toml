@@ -25,7 +25,7 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
-    "flake8>=6.0.0",
+    "Flake8-pyproject",
     "freezegun>=1.5.5",
     "pytest-asyncio>=0.24.0",
 ]
@@ -46,4 +46,5 @@ target-version = ['py310', 'py311', 'py312', 'py313']
 
 [tool.flake8]
 max-line-length = 120
+ignore = "E203, W503"
 exclude = [".git", "__pycache__", "build", "dist", "*.egg-info", "venv", "alix-venv"]
