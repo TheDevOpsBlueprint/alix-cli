@@ -33,6 +33,9 @@ dev = [
 [project.scripts]
 alix = "alix.cli:main"
 
+[tool.setuptools.packages.find]
+exclude = ["backups*"]
+
 [tool.pytest.ini_options]
 addopts = "--cov=alix --cov-branch --cov-report=term-missing"
 testpaths = ["tests"]
