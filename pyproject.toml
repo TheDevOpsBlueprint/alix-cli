@@ -9,7 +9,7 @@ description = "Interactive alias manager for your shell"
 authors = [{name = "TheDevOpsBlueprint"}]
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "click>=8.0.0",
     "rich>=13.0.0",
@@ -39,7 +39,7 @@ testpaths = ["tests"]
 
 [tool.black]
 line-length = 120
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+target-version = ['py310', 'py311', 'py312', 'py313']
 
 [tool.flake8]
 max-line-length = 120
