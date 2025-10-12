@@ -17,6 +17,10 @@ install: venv  ## Install alix in production mode
 dev-install: venv  ## Install alix with dev dependencies
 	$(PIP) install -e ".[dev]"
 
+black: dev-install  ## Run black
+	$(VENV)/bin/black alix
+	$(VENV)/bin/black tests
+
 check-style: dev-install  ## Run style checks
 	$(VENV)/bin/flake8 alix --count --show-source --statistics
 	$(VENV)/bin/flake8 tests --count --show-source --statistics

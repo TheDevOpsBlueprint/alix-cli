@@ -735,29 +735,6 @@ class AliasManager(App):
 
         self.update_status(len(aliases))
 
-    def update_status(self, shown: int = None) -> None:
-
-        status = self.query_one("#status-bar", Static)
-        total = len(self.storage.list_all())
-
-        # Add fuzzy search indicator
-        fuzzy_status = "[green]Fuzzy ON[/]" if self.fuzzy_search_enabled else "[dim]Fuzzy OFF[/]"
-
-        # Add filter indicators
-        filter_text = ""
-        current_group_filter = getattr(self, "_current_group_filter", None)
-        current_tag_filter = getattr(self, "_current_tag_filter", None)
-
-        if current_group_filter and current_group_filter != "All Groups":
-            filter_text += f" | Group: {current_group_filter}"
-        if current_tag_filter and current_tag_filter != "All Tags":
-            filter_text += f" | Tag: {current_tag_filter}"
-
-        if shown is not None:
-            status.update(f"Showing2 {shown} of {total} aliases | {fuzzy_status}{filter_text} | Press 'p' to apply all")
-        else:
-            status.update(f"Total2: {total} aliases | {fuzzy_status}{filter_text} | Press 'p' to apply all")
-
     def update_info_panel(self, alias: Alias) -> None:
         info = self.query_one("#info-content", Static)
         # Escape any markup characters in the alias data
@@ -1032,3 +1009,17 @@ class AliasManager(App):
             self.notify("Showing untagged aliases", severity="information")
         else:
             self.notify(f"Showing aliases with tag: {selected_tag}", severity="information")
+
+    def update_status(self, shown: int = None) -> None:
+        status = self.query_one("#status-bar", Static)
+        total = len(self.storage.list_all())
+
+        current_filter = getattr(self, '_current_group_filter', None)
+        filter_text = ""
+        if current_filter and current_filter != "All Groups":
+            filter_text = f" | Filter: {current_filter}"
+
+        if shown is not None:
+            status.update(f"Showing {shown} of {total} aliases{filter_text} | Press 'g' to filter by group")
+        else:
+            status.update(f"Total: {total} aliases{filter_text} | Press 'g' to filter by group")
