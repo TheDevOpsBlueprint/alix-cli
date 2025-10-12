@@ -497,3 +497,83 @@ class TestIntegration:
         assert loaded_alias.last_used is not None
         assert len(loaded_alias.usage_history) == 1
         assert loaded_alias.usage_history[0].context == "context1"
+
+
+class TestAliasModel:
+    """Test Alias model functionality"""
+
+    def test_alias_from_dict_with_string_created_at(self):
+        """Test Alias.from_dict with string created_at field"""
+        # Create test data with string created_at
+        past_time = datetime.now().isoformat()
+        data = {
+            "name": "test_alias",
+            "command": "echo hello",
+            "created_at": past_time,  # String format to trigger conversion
+            "used_count": 0
+        }
+
+        # Create alias from dict - this should trigger the created_at conversion
+        alias = Alias.from_dict(data)
+
+        # Verify the conversion worked
+        assert alias.name == "test_alias"
+        assert alias.command == "echo hello"
+        assert alias.created_at is not None
+        assert isinstance(alias.created_at, datetime)
+
+    def test_alias_from_dict_with_usage_history(self):
+        """Test Alias.from_dict with usage_history field"""
+        # Create test data with usage_history
+        usage_time = datetime.now().isoformat()
+        data = {
+            "name": "test_alias",
+            "command": "echo hello",
+            "used_count": 1,
+            "usage_history": [
+                {
+                    "timestamp": usage_time,
+                    "context": "test context"
+                }
+            ]
+        }
+
+        # Create alias from dict - this should trigger usage_history conversion
+        alias = Alias.from_dict(data)
+
+        # Verify the conversion worked
+        assert alias.name == "test_alias"
+        assert alias.command == "echo hello"
+        assert alias.used_count == 1
+        assert len(alias.usage_history) == 1
+        assert isinstance(alias.usage_history[0], UsageRecord)
+        assert alias.usage_history[0].context == "test context"
+
+    def test_alias_from_dict_with_both_conversions(self):
+        """Test Alias.from_dict with both created_at and usage_history conversions"""
+        # Create test data with both string fields that need conversion
+        created_time = datetime.now().isoformat()
+        usage_time = datetime.now().isoformat()
+        data = {
+            "name": "test_alias",
+            "command": "echo hello",
+            "created_at": created_time,  # String format
+            "used_count": 1,
+            "usage_history": [
+                {
+                    "timestamp": usage_time,
+                    "context": "test context"
+                }
+            ]
+        }
+
+        # Create alias from dict - this should trigger both conversions
+        alias = Alias.from_dict(data)
+
+        # Verify both conversions worked
+        assert alias.name == "test_alias"
+        assert alias.command == "echo hello"
+        assert isinstance(alias.created_at, datetime)
+        assert alias.used_count == 1
+        assert len(alias.usage_history) == 1
+        assert isinstance(alias.usage_history[0], UsageRecord)
