@@ -1014,7 +1014,7 @@ class AliasManager(App):
         status = self.query_one("#status-bar", Static)
         total = len(self.storage.list_all())
 
-        current_filter = getattr(self, '_current_group_filter', None)
+        current_filter = getattr(self, "_current_group_filter", None)
         filter_text = ""
         if current_filter and current_filter != "All Groups":
             filter_text = f" | Filter: {current_filter}"

@@ -1,9 +1,9 @@
 from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
+from alix.models import Alias
 from alix.porter import AliasPorter
 from alix.storage import AliasStorage
-from alix.models import Alias
 
 
 def test_export_to_dict__from_list(alias_list, porter_data):
@@ -228,7 +228,7 @@ class TestPorterTagFiltering:
             "aliases": [
                 {"name": "alias1", "command": "echo 1", "tags": ["tag1"]},
                 {"name": "alias2", "command": "echo 2", "tags": ["tag2"]},
-                {"name": "alias3", "command": "echo 3", "tags": ["tag1", "tag2"]}
+                {"name": "alias3", "command": "echo 3", "tags": ["tag1", "tag2"]},
             ]
         }
         mock_json.load.return_value = import_data
@@ -236,9 +236,7 @@ class TestPorterTagFiltering:
         porter = AliasPorter()
         porter.storage = mock_storage
 
-        with patch("alix.porter.open", mocked_open), patch(
-            "pathlib.Path.exists", autospec=True
-        ) as mock_exists:
+        with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
             mock_exists.return_value = True
 
             result = porter.import_from_file(Path("/tmp/test.json"), tag_filter="tag1")

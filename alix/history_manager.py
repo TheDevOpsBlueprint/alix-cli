@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Tuple, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from alix.models import Alias
 
@@ -62,13 +63,16 @@ class HistoryManager:
     def _format_message(self, action: str, op_type: str, count: int, total: int, skipped: int = 0) -> str:
         """Format user-friendly messages with emojis and proper grammar."""
         if skipped > 0:
+            action_message = "restored" if "remove" in op_type else "processed"
             if action in ["Undid", "Redid"]:
-                return f"{action} {op_type} ({count} of {total} aliases {'restored' if 'remove' in op_type else 'processed'}, {skipped} skipped)"
+                return f"{action} {op_type} ({count} of {total} aliases {action_message}, {skipped} skipped)"
             else:
-                return f"{action} {op_type} ({count} of {total} aliases {'restored' if 'remove' in op_type else 'processed'}, {skipped} skipped)"
+                return f"{action} {op_type} ({count} of {total} aliases {action_message}, {skipped} skipped)"
 
         if count != total:
-            return f"{action} {op_type} ({count} of {total} aliases {'restored' if 'remove' in op_type else 'processed'})"
+            return (
+                f"{action} {op_type} ({count} of {total} aliases {'restored' if 'remove' in op_type else 'processed'})"
+            )
 
         # Handle pluralization
         alias_word = "aliases" if count != 1 else "alias"
@@ -78,7 +82,16 @@ class HistoryManager:
             return f"{action} {op_type} ({count} {alias_word} {'added' if action == 'Redid' else 'removed'})"
         elif op_type == "edit":
             return f"{action} {op_type} ({count} {alias_word} {'updated' if action == 'Redid' else 'restored'})"
-        elif op_type in ["group_add", "group_remove", "tag_add", "tag_remove", "tag_rename", "tag_delete", "group_delete", "group_import"]:
+        elif op_type in [
+            "group_add",
+            "group_remove",
+            "tag_add",
+            "tag_remove",
+            "tag_rename",
+            "tag_delete",
+            "group_delete",
+            "group_import",
+        ]:
             return f"{action} {op_type} ({count} {alias_word} {'processed' if action == 'Redid' else 'processed'})"
         elif op_type == "rename":
             return f"{action} {op_type} ({count} {alias_word} {'renamed' if action == 'Redid' else 'renamed back'})"
@@ -532,7 +545,9 @@ class HistoryManager:
             raise
 
     def perform_undo(self, storage) -> str:
-        """Undo last op. storage must implement add(alias, record_history=False) and remove(name, record_history=False)."""
+        """Undo last op. storage must implement add(alias, record_history=False)
+        and remove(name, record_history=False).
+        """
         if not self.undo:
             return "⚠️  Nothing to undo – history is empty."
 
@@ -548,7 +563,9 @@ class HistoryManager:
         return f"✅ {message}"
 
     def perform_redo(self, storage) -> str:
-        """Redo last undone op. storage must implement add(alias, record_history=False) and remove(name, record_history=False)."""
+        """Redo last undone op. storage must implement add(alias, record_history=False)
+        and remove(name, record_history=False).
+        """
         if not self.redo:
             return "⚠️  Nothing to redo – already at the latest state."
 

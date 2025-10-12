@@ -498,7 +498,7 @@ class TestAliasModel:
             "name": "test_alias",
             "command": "echo hello",
             "created_at": past_time,  # String format to trigger conversion
-            "used_count": 0
+            "used_count": 0,
         }
 
         # Create alias from dict - this should trigger the created_at conversion
@@ -518,12 +518,7 @@ class TestAliasModel:
             "name": "test_alias",
             "command": "echo hello",
             "used_count": 1,
-            "usage_history": [
-                {
-                    "timestamp": usage_time,
-                    "context": "test context"
-                }
-            ]
+            "usage_history": [{"timestamp": usage_time, "context": "test context"}],
         }
 
         # Create alias from dict - this should trigger usage_history conversion
@@ -547,12 +542,7 @@ class TestAliasModel:
             "command": "echo hello",
             "created_at": created_time,  # String format
             "used_count": 1,
-            "usage_history": [
-                {
-                    "timestamp": usage_time,
-                    "context": "test context"
-                }
-            ]
+            "usage_history": [{"timestamp": usage_time, "context": "test context"}],
         }
 
         # Create alias from dict - this should trigger both conversions

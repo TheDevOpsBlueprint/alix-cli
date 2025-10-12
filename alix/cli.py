@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import click
+import yaml
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -15,7 +16,7 @@ from alix.models import Alias
 from alix.porter import AliasPorter
 from alix.render import Render
 from alix.scanner import AliasScanner
-from alix.shell_detector import ShellType
+from alix.shell_detector import ShellDetector, ShellType
 from alix.shell_integrator import ShellIntegrator
 from alix.shell_wrapper import ShellWrapper
 from alix.storage import AliasStorage
@@ -131,7 +132,7 @@ def edit(name, command, description, no_apply):
             created_at=alias.created_at,
             used_count=alias.used_count,
             last_used=alias.last_used,
-            usage_history=alias.usage_history.copy()
+            usage_history=alias.usage_history.copy(),
         )
 
         # Update alias with new values
@@ -147,8 +148,8 @@ def edit(name, command, description, no_apply):
         history_op = {
             "type": "edit",
             "aliases": [original_alias.to_dict()],  # Original state
-            "new_aliases": [alias.to_dict()],       # New state
-            "timestamp": datetime.now().isoformat()
+            "new_aliases": [alias.to_dict()],  # New state
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -530,7 +531,7 @@ def list_undo():
         return
 
     console.print("[bold cyan]📚 Undo History (most recent last):[/]")
-    console.print(f"[dim]Use 'alix undo --id <number>' to undo a specific operation[/]")
+    console.print("[dim]Use 'alix undo --id <number>' to undo a specific operation[/]")
 
     for i, op in enumerate(undo_ops, 1):
         op_type = op.get("type", "unknown")
@@ -539,10 +540,9 @@ def list_undo():
 
         # Format timestamp for better readability
         try:
-            from datetime import datetime
-            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
             formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-        except:
+        except Exception:
             formatted_time = timestamp
 
         # Color code by operation type
@@ -593,7 +593,9 @@ def list_undo():
         console.print(f"  [bold]{i}.[/] [{type_color}]{type_icon} {op_type.upper()}[/] {aliases_str}")
         console.print(f"      [dim]at {formatted_time}[/]")
 
-    console.print(f"\n[dim]💡 Tip: Use 'alix undo --id 1' for most recent, 'alix undo --id {len(undo_ops)}' for oldest[/]")
+    console.print(
+        f"\n[dim]💡 Tip: Use 'alix undo --id 1' for most recent, 'alix undo --id {len(undo_ops)}' for oldest[/]"
+    )
 
 
 @main.command()
@@ -605,7 +607,7 @@ def list_redo():
         return
 
     console.print("[bold cyan]🔄 Redo History (most recent last):[/]")
-    console.print(f"[dim]Use 'alix redo --id <number>' to redo a specific operation[/]")
+    console.print("[dim]Use 'alix redo --id <number>' to redo a specific operation[/]")
 
     for i, op in enumerate(redo_ops, 1):
         op_type = op.get("type", "unknown")
@@ -614,10 +616,9 @@ def list_redo():
 
         # Format timestamp for better readability
         try:
-            from datetime import datetime
-            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
             formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-        except:
+        except Exception:
             formatted_time = timestamp
 
         # Color code by operation type
@@ -668,7 +669,9 @@ def list_redo():
         console.print(f"  [bold]{i}.[/] [{type_color}]{type_icon} {op_type.upper()}[/] {aliases_str}")
         console.print(f"      [dim]at {formatted_time}[/]")
 
-    console.print(f"\n[dim]💡 Tip: Use 'alix redo --id 1' for most recent, 'alix redo --id {len(redo_ops)}' for oldest[/]")
+    console.print(
+        f"\n[dim]💡 Tip: Use 'alix redo --id 1' for most recent, 'alix redo --id {len(redo_ops)}' for oldest[/]"
+    )
 
 
 @main.command()
@@ -731,8 +734,6 @@ def setup_tracking(shell, file, standalone, output):
             return
     else:
         # Auto-detect shell
-        from alix.shell_detector import ShellDetector, ShellType
-
         detector = ShellDetector()
         shell_type = detector.detect_current_shell()
         if not shell_type or shell_type == ShellType.UNKNOWN:
@@ -931,14 +932,12 @@ def add_group(group_name, alias_name):
     storage.aliases[alias_name] = alias
     storage.save()
 
-    # Record history for group_add operation
-    from alix.history_manager import HistoryManager
     history_op = {
         "type": "group_add",
         "aliases": [alias.to_dict()],
         "group_name": group_name,
         "old_group": old_group,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     storage.history.push(history_op)
 
@@ -971,7 +970,7 @@ def remove_group(group_name, alias_name):
         "aliases": [alias.to_dict()],
         "group_name": group_name,
         "old_group": old_group,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     storage.history.push(history_op)
 
@@ -1008,7 +1007,7 @@ def delete_group(group_name, reassign):
             "aliases": [alias.to_dict() for alias in group_aliases],
             "group_name": group_name,
             "reassign_to": new_group,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -1027,7 +1026,7 @@ def delete_group(group_name, reassign):
             "aliases": [alias.to_dict() for alias in group_aliases],
             "group_name": group_name,
             "reassign_to": None,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -1057,7 +1056,6 @@ def import_group(file, group):
                 continue
 
             alias = Alias.from_dict(alias_data)
-            old_group = alias.group
             alias.group = target_group
             storage.aliases[alias_name] = alias
             imported_count += 1
@@ -1065,13 +1063,20 @@ def import_group(file, group):
         storage.save()
 
         # Record history for group import operation
-        imported_aliases = [storage.get(alias_name) for alias_name in [alias_name for alias_name, _ in data["aliases"].items() if alias_name not in storage.aliases or storage.aliases[alias_name].group != target_group]]
+        imported_aliases = [
+            storage.get(alias_name)
+            for alias_name in [
+                alias_name
+                for alias_name, _ in data["aliases"].items()
+                if alias_name not in storage.aliases or storage.aliases[alias_name].group != target_group
+            ]
+        ]
         if imported_aliases:
             history_op = {
                 "type": "group_import",
                 "aliases": [alias.to_dict() for alias in imported_aliases],
                 "group_name": target_group,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
             storage.history.push(history_op)
 
@@ -1199,7 +1204,6 @@ def add_tag(alias_name, tags):
 
     # Add new tags (avoid duplicates)
     original_count = len(alias.tags)
-    original_tags = alias.tags.copy()
     added_tags = []
     for tag in tags:
         if tag not in alias.tags:
@@ -1215,7 +1219,7 @@ def add_tag(alias_name, tags):
             "type": "tag_add",
             "aliases": [alias.to_dict()],
             "added_tags": added_tags,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -1238,7 +1242,6 @@ def remove_tag(alias_name, tags):
 
     # Remove specified tags
     original_count = len(alias.tags)
-    original_tags = alias.tags.copy()
     removed_tags = []
     for tag in tags:
         if tag in alias.tags:
@@ -1254,7 +1257,7 @@ def remove_tag(alias_name, tags):
             "type": "tag_remove",
             "aliases": [alias.to_dict()],
             "removed_tags": removed_tags,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -1313,7 +1316,7 @@ def rename_tag(old_tag, new_tag, dry_run):
             "aliases": updated_aliases,
             "old_tag": old_tag,
             "new_tag": new_tag,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -1362,7 +1365,7 @@ def delete_tag(tag_name, dry_run):
             "type": "tag_delete",
             "aliases": updated_aliases,
             "deleted_tag": tag_name,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         storage.history.push(history_op)
 
@@ -1443,8 +1446,6 @@ def export_tag(tag_name, file, format):
 
     try:
         if format == "yaml":
-            import yaml
-
             with open(filepath, "w") as f:
                 yaml.dump(export_data, f, default_flow_style=False, sort_keys=False)
         else:  # json

@@ -1,6 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 import yaml
-from unittest.mock import patch, MagicMock
 
 from alix.template_manager import TemplateManager
 
@@ -19,19 +20,9 @@ class TestTemplateManager:
             "category": "test",
             "description": "Test template",
             "aliases": [
-                {
-                    "name": "test1",
-                    "command": "echo test1",
-                    "description": "Test alias 1",
-                    "tags": ["test"]
-                },
-                {
-                    "name": "test2",
-                    "command": "echo test2",
-                    "description": "Test alias 2",
-                    "tags": ["test"]
-                }
-            ]
+                {"name": "test1", "command": "echo test1", "description": "Test alias 1", "tags": ["test"]},
+                {"name": "test2", "command": "echo test2", "description": "Test alias 2", "tags": ["test"]},
+            ],
         }
 
         with open(templates_dir / "valid.yaml", "w") as f:
@@ -40,12 +31,7 @@ class TestTemplateManager:
         with open(templates_dir / "malformed.yaml", "w") as f:
             f.write("invalid: yaml: content: [\n")
 
-        empty_template = {
-            "version": "1.0",
-            "category": "empty",
-            "description": "Empty template",
-            "aliases": []
-        }
+        empty_template = {"version": "1.0", "category": "empty", "description": "Empty template", "aliases": []}
 
         with open(templates_dir / "empty.yaml", "w") as f:
             yaml.dump(empty_template, f)
@@ -57,9 +43,9 @@ class TestTemplateManager:
         manager = TemplateManager()
         manager.templates_dir = temp_templates_dir
 
-        assert hasattr(manager, '_templates')
-        assert hasattr(manager, 'templates_dir')
-        assert hasattr(manager, 'storage')
+        assert hasattr(manager, "_templates")
+        assert hasattr(manager, "templates_dir")
+        assert hasattr(manager, "storage")
 
     def test_load_templates_success(self, temp_templates_dir):
         """Test successful template loading"""
@@ -232,35 +218,19 @@ class TestTemplateManager:
         manager = TemplateManager()
 
         # Missing version
-        data = {
-            "category": "test",
-            "description": "test",
-            "aliases": []
-        }
+        data = {"category": "test", "description": "test", "aliases": []}
         assert not manager._validate_template_data(data, "test.yaml")
 
         # Missing category
-        data = {
-            "version": "1.0",
-            "description": "test",
-            "aliases": []
-        }
+        data = {"version": "1.0", "description": "test", "aliases": []}
         assert not manager._validate_template_data(data, "test.yaml")
 
         # Missing description
-        data = {
-            "version": "1.0",
-            "category": "test",
-            "aliases": []
-        }
+        data = {"version": "1.0", "category": "test", "aliases": []}
         assert not manager._validate_template_data(data, "test.yaml")
 
         # Missing aliases
-        data = {
-            "version": "1.0",
-            "category": "test",
-            "description": "test"
-        }
+        data = {"version": "1.0", "category": "test", "description": "test"}
         assert not manager._validate_template_data(data, "test.yaml")
 
     def test_validate_template_data_invalid_aliases_list(self):
@@ -268,12 +238,7 @@ class TestTemplateManager:
         manager = TemplateManager()
 
         # Aliases is not a list
-        data = {
-            "version": "1.0",
-            "category": "test",
-            "description": "test",
-            "aliases": "invalid"
-        }
+        data = {"version": "1.0", "category": "test", "description": "test", "aliases": "invalid"}
         assert not manager._validate_template_data(data, "test.yaml")
 
     def test_validate_template_data_invalid_alias_data(self):
@@ -281,12 +246,7 @@ class TestTemplateManager:
         manager = TemplateManager()
 
         # Alias is not a dict
-        data = {
-            "version": "1.0",
-            "category": "test",
-            "description": "test",
-            "aliases": ["invalid"]
-        }
+        data = {"version": "1.0", "category": "test", "description": "test", "aliases": ["invalid"]}
         assert not manager._validate_template_data(data, "test.yaml")
 
     def test_validate_template_data_missing_alias_fields(self):
@@ -294,21 +254,11 @@ class TestTemplateManager:
         manager = TemplateManager()
 
         # Missing name
-        data = {
-            "version": "1.0",
-            "category": "test",
-            "description": "test",
-            "aliases": [{"command": "echo test"}]
-        }
+        data = {"version": "1.0", "category": "test", "description": "test", "aliases": [{"command": "echo test"}]}
         assert not manager._validate_template_data(data, "test.yaml")
 
         # Missing command
-        data = {
-            "version": "1.0",
-            "category": "test",
-            "description": "test",
-            "aliases": [{"name": "test"}]
-        }
+        data = {"version": "1.0", "category": "test", "description": "test", "aliases": [{"name": "test"}]}
         assert not manager._validate_template_data(data, "test.yaml")
 
     def test_load_templates_exception_handling(self, tmp_path):

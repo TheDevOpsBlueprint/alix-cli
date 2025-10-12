@@ -1,7 +1,8 @@
-import yaml
-from pathlib import Path
-from typing import List, Dict, Optional
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import yaml
 
 from alix.models import Alias
 from alix.storage import AliasStorage

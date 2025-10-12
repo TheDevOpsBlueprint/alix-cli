@@ -1,6 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 from click.testing import CliRunner
-from unittest.mock import patch, MagicMock
 
 from alix.cli import main
 from alix.template_manager import TemplateManager
@@ -25,7 +26,7 @@ class TestTemplatesCLI:
         mock_template.description = "Git version control aliases"
         mock_template.aliases = [
             MagicMock(name="gs", command="git status", description="Git status", tags=["git"]),
-            MagicMock(name="ga", command="git add", description="Git add", tags=["git"])
+            MagicMock(name="ga", command="git add", description="Git add", tags=["git"]),
         ]
 
         mock_manager.list_templates.return_value = [mock_template]
@@ -82,7 +83,7 @@ class TestTemplatesCLI:
         mock_template.description = "Git version control aliases"
         mock_template.aliases = [
             Alias(name="gs", command="git status", description="Git status", tags=["git"]),
-            Alias(name="ga", command="git add", description="Git add", tags=["git"])
+            Alias(name="ga", command="git add", description="Git add", tags=["git"]),
         ]
         mock_template_manager.get_template.return_value = mock_template
         mock_template_manager_class.return_value = mock_template_manager

@@ -1,3 +1,4 @@
+import stat
 from datetime import datetime
 
 import pytest
@@ -147,6 +148,7 @@ def test_partial_failures(temp_storage):
     msg = temp_storage.history.perform_undo(temp_storage)
     assert "skipped" in msg.lower()
 
+
 def test_multiple_undos_redos(temp_storage):
     # Add multiple aliases
     for i in range(3):
@@ -169,6 +171,7 @@ def test_multiple_undos_redos(temp_storage):
     # Redo beyond full
     msg = temp_storage.history.perform_redo(temp_storage)
     assert "⚠️  Nothing to redo – already at the latest state." in msg
+
 
 def test_remove_nonexistent(temp_storage):
     # Remove alias that does not exist
@@ -369,7 +372,7 @@ def test_rename_operation_undo_redo(temp_storage):
         "aliases": [{"name": "old_name", "command": "echo hello"}],
         "old_name": "old_name",
         "new_name": "new_name",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     temp_storage.history.push(rename_op)
 
@@ -406,12 +409,9 @@ def test_group_operations_undo_redo(temp_storage):
     # Add to group (simulate group_add operation)
     group_add_op = {
         "type": "group_add",
-        "aliases": [
-            {"name": "test1", "command": "echo one"},
-            {"name": "test2", "command": "echo two"}
-        ],
+        "aliases": [{"name": "test1", "command": "echo one"}, {"name": "test2", "command": "echo two"}],
         "group_name": "test_group",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     temp_storage.history.push(group_add_op)
 
@@ -450,7 +450,7 @@ def test_tag_operations_undo_redo(temp_storage):
         "type": "tag_add",
         "aliases": [{"name": "test", "command": "echo hello", "tags": ["old"]}],
         "added_tags": ["new_tag"],
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     temp_storage.history.push(tag_add_op)
 
@@ -483,9 +483,9 @@ def test_import_operation_undo_redo(temp_storage):
         "type": "import",
         "aliases": [
             {"name": "imported1", "command": "echo imported1"},
-            {"name": "imported2", "command": "echo imported2"}
+            {"name": "imported2", "command": "echo imported2"},
         ],
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     temp_storage.history.push(import_op)
 
@@ -573,7 +573,7 @@ def test_corrupted_history_during_operations(temp_storage, tmp_path):
 
     # Corrupt the history file
     history_file = tmp_path / "aliases_history.json"
-    with open(history_file, 'w') as f:
+    with open(history_file, "w") as f:
         f.write("{ invalid json content }")
 
     # Try to undo - should handle gracefully
@@ -593,7 +593,7 @@ def test_invalid_operation_data_handling(temp_storage):
     invalid_op = {
         "type": "add",
         # Missing "aliases" field
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
     # This should raise an error when pushing
@@ -604,11 +604,7 @@ def test_invalid_operation_data_handling(temp_storage):
         pass  # Expected
 
     # Push operation with empty aliases
-    empty_op = {
-        "type": "add",
-        "aliases": [],
-        "timestamp": datetime.now().isoformat()
-    }
+    empty_op = {"type": "add", "aliases": [], "timestamp": datetime.now().isoformat()}
     temp_storage.history.push(empty_op)
 
     # Undo should handle empty aliases gracefully
@@ -653,9 +649,6 @@ def test_storage_failures_during_undo_redo(temp_storage):
 
 def test_history_file_permission_errors(tmp_path):
     """Test handling of file permission errors."""
-    # Create a read-only directory for history
-    import os
-    import stat
 
     readonly_dir = tmp_path / "readonly"
     readonly_dir.mkdir()
@@ -672,12 +665,14 @@ def test_history_file_permission_errors(tmp_path):
         history = HistoryManager(path=readonly_file)
 
         # Try operations that require writing
-        alias = Alias(name="test", command="echo hello")
-        history.push({
-            "type": "add",
-            "aliases": [{"name": "test", "command": "echo hello"}],
-            "timestamp": datetime.now().isoformat()
-        })
+        Alias(name="test", command="echo hello")
+        history.push(
+            {
+                "type": "add",
+                "aliases": [{"name": "test", "command": "echo hello"}],
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         # Should handle gracefully (fail silently as per current implementation)
         undo_msg = history.perform_undo(None)  # Pass None storage to avoid other errors
@@ -693,16 +688,9 @@ def test_very_large_history_operations(temp_storage):
     # Create operation with many aliases
     many_aliases = []
     for i in range(100):  # Large number of aliases
-        many_aliases.append({
-            "name": f"alias{i}",
-            "command": f"echo {i}"
-        })
+        many_aliases.append({"name": f"alias{i}", "command": f"echo {i}"})
 
-    large_op = {
-        "type": "add",
-        "aliases": many_aliases,
-        "timestamp": datetime.now().isoformat()
-    }
+    large_op = {"type": "add", "aliases": many_aliases, "timestamp": datetime.now().isoformat()}
     temp_storage.history.push(large_op)
 
     # Add all aliases to storage
@@ -730,7 +718,7 @@ def test_malformed_alias_data_in_history(temp_storage):
             {"command": "echo no_name"},  # Missing name
             {"name": "no_command"},  # Missing command
         ],
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
     temp_storage.history.push(malformed_op)
 
@@ -753,8 +741,6 @@ def test_malformed_alias_data_in_history(temp_storage):
 
 def test_concurrent_history_modifications(temp_storage):
     """Test handling of concurrent modifications to history."""
-    # Get initial history state
-    initial_undo_count = len(temp_storage.history.list_undo())
 
     # Simulate concurrent modification by directly modifying the lists
     original_undo = temp_storage.history.undo[:]
@@ -765,11 +751,13 @@ def test_concurrent_history_modifications(temp_storage):
     temp_storage.add(alias, record_history=True)
 
     # Simulate concurrent modification (another process modified history)
-    temp_storage.history.undo.append({
-        "type": "add",
-        "aliases": [{"name": "concurrent", "command": "echo concurrent"}],
-        "timestamp": datetime.now().isoformat()
-    })
+    temp_storage.history.undo.append(
+        {
+            "type": "add",
+            "aliases": [{"name": "concurrent", "command": "echo concurrent"}],
+            "timestamp": datetime.now().isoformat(),
+        }
+    )
 
     # Try to undo - should handle the concurrent modification gracefully
     msg = temp_storage.history.perform_undo(temp_storage)
@@ -832,7 +820,7 @@ def test_group_delete_undo_redo_without_reassignment(temp_storage):
         "aliases": [alias.to_dict() for alias in group_aliases],
         "group_name": "testgroup",
         "reassign_to": None,  # No reassignment
-        "timestamp": "2025-01-01T00:00:00.000000"
+        "timestamp": "2025-01-01T00:00:00.000000",
     }
     temp_storage.history.push(history_op)
 
@@ -878,7 +866,7 @@ def test_group_delete_undo_redo_with_reassignment(temp_storage):
         "aliases": [alias.to_dict() for alias in group_aliases],
         "group_name": "oldgroup",
         "reassign_to": "newgroup",  # Reassignment target
-        "timestamp": "2025-01-01T00:00:00.000000"
+        "timestamp": "2025-01-01T00:00:00.000000",
     }
     temp_storage.history.push(history_op)
 
