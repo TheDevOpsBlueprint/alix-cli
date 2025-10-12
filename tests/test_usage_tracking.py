@@ -176,6 +176,106 @@ class TestUsageTracker:
         assert "tracking_data" in data
         assert "summary" in data
 
+    def test_initialization_without_storage_path(self, temp_dir):
+        """Test initialization without providing storage_path"""
+        # Mock the home directory to use temp_dir for this test
+        with patch('pathlib.Path.home', return_value=temp_dir):
+            # Create a UsageTracker without providing storage_path
+            # This should use the default path and create the directory
+            usage_tracker = UsageTracker()
+
+            # Check that the tracking directory was created
+            assert usage_tracker.tracking_dir.exists()
+            assert usage_tracker.tracking_dir.is_dir()
+
+            # Check that the tracking file path is set correctly
+            expected_path = temp_dir / ".alix" / "usage_tracking.json"
+            assert usage_tracker.tracking_file == expected_path
+
+    def test_load_tracking_data_corrupted_file(self, usage_tracker):
+        """Test loading corrupted tracking data file"""
+        # Create a corrupted JSON file
+        corrupted_content = "{ invalid json content }"
+        usage_tracker.tracking_file.write_text(corrupted_content)
+
+        # Loading should handle the error gracefully and return empty dict
+        data = usage_tracker._load_tracking_data()
+        assert data == {}
+
+    def test_usage_date_cleanup(self, usage_tracker):
+        """Test usage date cleanup when more than 30 dates"""
+        alias_name = "test_alias"
+
+        # Track usage more than 30 times to trigger cleanup
+        for i in range(35):
+            usage_tracker.track_alias_usage(alias_name)
+
+        # Check that only last 30 usage dates are kept
+        alias_data = usage_tracker.tracking_data["alias_usage"][alias_name]
+        usage_dates = alias_data["usage_dates"]
+        assert len(usage_dates) == 30
+
+        # Verify total uses is still correct
+        assert alias_data["total_uses"] == 35
+
+    def test_get_usage_analytics_empty_aliases(self, usage_tracker):
+        """Test getting usage analytics with empty aliases list"""
+        # Test with empty aliases list
+        analytics = usage_tracker.get_usage_analytics([])
+
+        assert analytics.total_aliases == 0
+        assert analytics.total_uses == 0
+        assert analytics.most_used_alias is None
+        assert analytics.least_used_alias is None
+        assert analytics.unused_aliases == []
+        assert analytics.recently_used == []
+        assert analytics.usage_trends == {}
+        assert analytics.average_usage_per_alias == 0.0
+        assert analytics.most_productive_aliases == []
+
+    def test_cleanup_old_data_daily_usage(self, usage_tracker):
+        """Test cleaning up old daily usage data"""
+        # Add old and new daily usage data
+        old_date = (datetime.now() - timedelta(days=100)).strftime("%Y-%m-%d")
+        new_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+
+        usage_tracker.tracking_data["daily_usage"] = {
+            old_date: 5,
+            new_date: 3
+        }
+
+        # Clean up data older than 30 days
+        usage_tracker.cleanup_old_data(days_to_keep=30)
+
+        # Old data should be removed, new data should remain
+        assert old_date not in usage_tracker.tracking_data["daily_usage"]
+        assert new_date in usage_tracker.tracking_data["daily_usage"]
+        assert usage_tracker.tracking_data["daily_usage"][new_date] == 3
+
+    def test_cleanup_old_data_alias_usage(self, usage_tracker):
+        """Test cleaning up old alias usage data"""
+        # Add old and new usage dates for an alias
+        old_date = (datetime.now() - timedelta(days=100)).isoformat()
+        new_date = (datetime.now() - timedelta(days=10)).isoformat()
+
+        alias_name = "test_alias"
+        usage_tracker.tracking_data["alias_usage"] = {
+            alias_name: {
+                "total_uses": 2,
+                "last_used": new_date,
+                "usage_dates": [old_date, new_date]
+            }
+        }
+
+        # Clean up data older than 30 days
+        usage_tracker.cleanup_old_data(days_to_keep=30)
+
+        # Old usage date should be removed, new date should remain
+        remaining_dates = usage_tracker.tracking_data["alias_usage"][alias_name]["usage_dates"]
+        assert old_date not in remaining_dates
+        assert new_date in remaining_dates
+        assert len(remaining_dates) == 1
+
 
 class TestAliasStorageIntegration:
     """Test integration of usage tracking with AliasStorage"""
