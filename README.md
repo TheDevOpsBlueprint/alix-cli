@@ -20,6 +20,8 @@ A powerful, htop-style terminal UI for managing shell aliases. Never forget a co
 - **Automatic Tracking**: Set up automatic usage tracking for all aliases
 - **Productivity Metrics**: See which aliases save you the most time
 - **Usage History**: View detailed usage patterns and trends
+- **Alias Templates**: Pre-built alias collections for common tools (git, docker, k8s)
+- **Template Marketplace**: Extensible template system for custom alias collections
 - **Themes**: Multiple color themes (ocean, forest, monochrome)
 - **Safe Operations**: Confirmation prompts for destructive actions
 
@@ -276,6 +278,53 @@ alix import my-aliases.json --merge
 
 # Import without merging (skip duplicates)
 alix import team-aliases.json
+```
+
+#### Alias Templates
+
+Quickly import pre-built alias collections for common development tools:
+
+```bash
+# List available templates
+alix templates list
+
+# Import git aliases
+alix templates add git
+
+# Preview docker aliases before importing
+alix templates add docker --dry-run
+
+# Import specific aliases from kubernetes template
+alix templates add k8s --aliases kgp,kgs,klog
+
+# Import entire category (all templates in a category)
+alix templates add-category docker
+
+# Apply imported aliases to your shell
+alix apply
+```
+
+**Available Templates:**
+- **Git**: Version control shortcuts (gs, ga, gc, gp, gl, gb, gco, gd)
+- **Docker**: Container management (di, dc, dca, dr, db, de, dl, drm)
+- **Kubernetes**: Cluster management (k, kgp, kgs, kgd, kgn, kl, kd, kctx)
+
+**Custom Templates:**
+Users can add their own templates by creating YAML files in `alix/templates/`:
+
+```yaml
+version: "1.0"
+category: "python"
+description: "Python development aliases"
+aliases:
+  - name: "py"
+    command: "python"
+    description: "Run Python interpreter"
+    tags: ["python", "dev"]
+  - name: "pipi"
+    command: "pip install"
+    description: "Install Python packages"
+    tags: ["python", "pip"]
 ```
 
 #### Usage Tracking & Analytics
