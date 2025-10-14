@@ -26,6 +26,28 @@ class TemplateManager:
         self._templates: Dict[str, Template] = {}
         self._load_templates()
 
+    def _validate_template_data(self, data: dict, filename: str) -> bool:
+        """Validate template YAML structure"""
+        if not isinstance(data, dict):
+            return False
+
+        required_fields = ["version", "category", "description", "aliases"]
+        for field in required_fields:
+            if field not in data:
+                return False
+
+        if not isinstance(data.get("aliases", []), list):
+            return False
+
+        # Validate each alias has required fields
+        for alias_data in data.get("aliases", []):
+            if not isinstance(alias_data, dict):
+                return False
+            if "name" not in alias_data or "command" not in alias_data:
+                return False
+
+        return True
+
     def _load_templates(self) -> None:
         """Load all templates from YAML files"""
         if not self.templates_dir.exists():
@@ -37,6 +59,11 @@ class TemplateManager:
                     data = yaml.safe_load(f)
 
                 template_name = yaml_file.stem
+
+                # Validate template structure
+                if not self._validate_template_data(data, yaml_file.name):
+                    continue  # Skip invalid templates
+
                 aliases = []
 
                 for alias_data in data.get("aliases", []):

@@ -1521,7 +1521,17 @@ def stats():
 
 @main.group()
 def templates():
-    """Manage alias templates"""
+    """Manage alias templates
+
+    Browse and import pre-defined alias collections for common development tools.
+
+    Examples:
+      alix templates list                    # Show available templates
+      alix templates add git                 # Import all git aliases
+      alix templates add docker --dry-run    # Preview docker aliases
+      alix templates add git --aliases gs,ga # Import specific git aliases
+      alix templates add-category k8s       # Import all k8s templates
+    """
     pass
 
 
