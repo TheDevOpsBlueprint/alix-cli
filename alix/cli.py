@@ -120,13 +120,39 @@ def edit(name, command, description, no_apply):
     if alias is None:
         console.print(f"[red]x[/]The alias '{name}' does not exist in alix yet")
     else:
+        # Store original state for history
+        original_alias = Alias(
+            name=alias.name,
+            command=alias.command,
+            description=alias.description,
+            tags=alias.tags.copy(),
+            group=alias.group,
+            shell=alias.shell,
+            created_at=alias.created_at,
+            used_count=alias.used_count,
+            last_used=alias.last_used,
+            usage_history=alias.usage_history.copy()
+        )
+
+        # Update alias with new values
         if command:
             alias.command = command
         if description:
             alias.description = description
-        storage.remove(alias.name, record_history=True)
-        storage.add(alias, record_history=True)
-        console.print(f"[green]✔[/] Added alias: [cyan]{name}[/] = '{command}'")
+
+        storage.remove(alias.name, record_history=False)
+        storage.add(alias, record_history=False)
+
+        # Record history for edit operation
+        history_op = {
+            "type": "edit",
+            "aliases": [original_alias.to_dict()],  # Original state
+            "new_aliases": [alias.to_dict()],       # New state
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
+        console.print(f"[green]✔[/] Edited alias: [cyan]{name}[/] = '{alias.command}'")
 
         if not no_apply:
             integrator = ShellIntegrator()
@@ -469,17 +495,31 @@ def track(alias_name, context):
 
 
 @main.command()
-def undo():
-    """Undo the last alias operation."""
-    msg = storage.history.perform_undo(storage)
-    console.print(msg)
+@click.option("--id", type=int, help="Undo specific operation by ID (from history list)")
+def undo(id):
+    """Undo the last alias operation or a specific operation by ID."""
+    if id is not None:
+        # Selective undo by ID
+        msg = storage.history.perform_undo_by_id(storage, id)
+        console.print(msg)
+    else:
+        # Regular undo (last operation)
+        msg = storage.history.perform_undo(storage)
+        console.print(msg)
 
 
 @main.command()
-def redo():
-    """Redo the last undone alias operation."""
-    msg = storage.history.perform_redo(storage)
-    console.print(msg)
+@click.option("--id", type=int, help="Redo specific operation by ID (from history list)")
+def redo(id):
+    """Redo the last undone alias operation or a specific operation by ID."""
+    if id is not None:
+        # Selective redo by ID
+        msg = storage.history.perform_redo_by_id(storage, id)
+        console.print(msg)
+    else:
+        # Regular redo (last undone operation)
+        msg = storage.history.perform_redo(storage)
+        console.print(msg)
 
 
 @main.command()
@@ -487,14 +527,74 @@ def list_undo():
     """List the undo history."""
     undo_ops = storage.history.list_undo()
     if not undo_ops:
-        console.print("[dim]No undo history.[/]")
+        console.print("[dim]📭 No undo history available.[/]")
         return
-    console.print("[bold cyan]Undo History (most recent last):[/]")
+
+    console.print("[bold cyan]📚 Undo History (most recent last):[/]")
+    console.print(f"[dim]Use 'alix undo --id <number>' to undo a specific operation[/]")
+
     for i, op in enumerate(undo_ops, 1):
         op_type = op.get("type", "unknown")
         aliases = [a.get("name", "N/A") for a in op.get("aliases", [])]
         timestamp = op.get("timestamp", "N/A")
-        console.print(f"{i}. [{op_type.upper()}] {', '.join(aliases)} at {timestamp}")
+
+        # Format timestamp for better readability
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            formatted_time = timestamp
+
+        # Color code by operation type
+        if op_type == "add":
+            type_color = "green"
+            type_icon = "➕"
+        elif op_type == "remove":
+            type_color = "red"
+            type_icon = "➖"
+        elif op_type == "edit":
+            type_color = "yellow"
+            type_icon = "✏️"
+        elif op_type == "import":
+            type_color = "blue"
+            type_icon = "📥"
+        elif op_type == "group_add":
+            type_color = "cyan"
+            type_icon = "📁➕"
+        elif op_type == "group_remove":
+            type_color = "cyan"
+            type_icon = "📁➖"
+        elif op_type == "group_delete":
+            type_color = "red"
+            type_icon = "📁✖️"
+        elif op_type == "group_import":
+            type_color = "blue"
+            type_icon = "📁📥"
+        elif op_type == "tag_add":
+            type_color = "magenta"
+            type_icon = "🏷️➕"
+        elif op_type == "tag_remove":
+            type_color = "magenta"
+            type_icon = "🏷️➖"
+        elif op_type == "tag_rename":
+            type_color = "yellow"
+            type_icon = "🏷️✏️"
+        elif op_type == "tag_delete":
+            type_color = "red"
+            type_icon = "🏷️✖️"
+        else:
+            type_color = "white"
+            type_icon = "🔧"
+
+        aliases_str = ", ".join(aliases[:3])  # Show max 3 aliases
+        if len(aliases) > 3:
+            aliases_str += f" ... (+{len(aliases) - 3} more)"
+
+        console.print(f"  [bold]{i}.[/] [{type_color}]{type_icon} {op_type.upper()}[/] {aliases_str}")
+        console.print(f"      [dim]at {formatted_time}[/]")
+
+    console.print(f"\n[dim]💡 Tip: Use 'alix undo --id 1' for most recent, 'alix undo --id {len(undo_ops)}' for oldest[/]")
 
 
 @main.command()
@@ -502,19 +602,77 @@ def list_redo():
     """List the redo history."""
     redo_ops = storage.history.list_redo()
     if not redo_ops:
-        console.print("[dim]No redo history.[/]")
+        console.print("[dim]📭 No redo history available.[/]")
         return
-    console.print("[bold cyan]Redo History (most recent last):[/]")
+
+    console.print("[bold cyan]🔄 Redo History (most recent last):[/]")
+    console.print(f"[dim]Use 'alix redo --id <number>' to redo a specific operation[/]")
+
     for i, op in enumerate(redo_ops, 1):
         op_type = op.get("type", "unknown")
         aliases = [a.get("name", "N/A") for a in op.get("aliases", [])]
         timestamp = op.get("timestamp", "N/A")
-        console.print(f"{i}. [{op_type.upper()}] {', '.join(aliases)} at {timestamp}")
+
+        # Format timestamp for better readability
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            formatted_time = timestamp
+
+        # Color code by operation type
+        if op_type == "add":
+            type_color = "green"
+            type_icon = "➕"
+        elif op_type == "remove":
+            type_color = "red"
+            type_icon = "➖"
+        elif op_type == "edit":
+            type_color = "yellow"
+            type_icon = "✏️"
+        elif op_type == "import":
+            type_color = "blue"
+            type_icon = "📥"
+        elif op_type == "group_add":
+            type_color = "cyan"
+            type_icon = "📁➕"
+        elif op_type == "group_remove":
+            type_color = "cyan"
+            type_icon = "📁➖"
+        elif op_type == "group_delete":
+            type_color = "red"
+            type_icon = "📁✖️"
+        elif op_type == "group_import":
+            type_color = "blue"
+            type_icon = "📁📥"
+        elif op_type == "tag_add":
+            type_color = "magenta"
+            type_icon = "🏷️➕"
+        elif op_type == "tag_remove":
+            type_color = "magenta"
+            type_icon = "🏷️➖"
+        elif op_type == "tag_rename":
+            type_color = "yellow"
+            type_icon = "🏷️✏️"
+        elif op_type == "tag_delete":
+            type_color = "red"
+            type_icon = "🏷️✖️"
+        else:
+            type_color = "white"
+            type_icon = "🔧"
+
+        aliases_str = ", ".join(aliases[:3])  # Show max 3 aliases
+        if len(aliases) > 3:
+            aliases_str += f" ... (+{len(aliases) - 3} more)"
+
+        console.print(f"  [bold]{i}.[/] [{type_color}]{type_icon} {op_type.upper()}[/] {aliases_str}")
+        console.print(f"      [dim]at {formatted_time}[/]")
+
+    console.print(f"\n[dim]💡 Tip: Use 'alix redo --id 1' for most recent, 'alix redo --id {len(redo_ops)}' for oldest[/]")
 
 
 @main.command()
-@click.option("--days", "-d", default=30, help="Number of days to show history for")
-@click.option("--alias", "-a", help="Show history for specific alias only")
 def history(days, alias):
     """Show usage history and trends"""
     if alias:
@@ -769,9 +927,21 @@ def add(group_name, alias_name):
         return
 
     # Update the alias with the new group
+    old_group = alias.group
     alias.group = group_name
     storage.aliases[alias_name] = alias
     storage.save()
+
+    # Record history for group_add operation
+    from alix.history_manager import HistoryManager
+    history_op = {
+        "type": "group_add",
+        "aliases": [alias.to_dict()],
+        "group_name": group_name,
+        "old_group": old_group,
+        "timestamp": datetime.now().isoformat()
+    }
+    storage.history.push(history_op)
 
     console.print(f"[green]✔[/] Added '{alias_name}' to group '{group_name}'")
 
@@ -791,9 +961,20 @@ def remove(group_name, alias_name):
         return
 
     # Remove the group from the alias
+    old_group = alias.group
     alias.group = None
     storage.aliases[alias_name] = alias
     storage.save()
+
+    # Record history for group_remove operation
+    history_op = {
+        "type": "group_remove",
+        "aliases": [alias.to_dict()],
+        "group_name": group_name,
+        "old_group": old_group,
+        "timestamp": datetime.now().isoformat()
+    }
+    storage.history.push(history_op)
 
     console.print(f"[green]✔[/] Removed '{alias_name}' from group '{group_name}'")
 
@@ -819,14 +1000,38 @@ def delete(group_name, reassign):
         for alias in group_aliases:
             alias.group = new_group
             storage.aliases[alias.name] = alias
+
         storage.save()
+
+        # Record history for group_delete with reassignment
+        history_op = {
+            "type": "group_delete",
+            "aliases": [alias.to_dict() for alias in group_aliases],
+            "group_name": group_name,
+            "reassign_to": new_group,
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
         console.print(f"[green]✔[/] Reassigned {len(group_aliases)} aliases to group '{new_group}'")
     else:
         # Remove group from aliases (set to None)
         for alias in group_aliases:
             alias.group = None
             storage.aliases[alias.name] = alias
+
         storage.save()
+
+        # Record history for group_delete
+        history_op = {
+            "type": "group_delete",
+            "aliases": [alias.to_dict() for alias in group_aliases],
+            "group_name": group_name,
+            "reassign_to": None,
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
         console.print(f"[green]✔[/] Removed group '{group_name}' from {len(group_aliases)} aliases")
 
 
@@ -853,11 +1058,23 @@ def import_group(file, group):
                 continue
 
             alias = Alias.from_dict(alias_data)
+            old_group = alias.group
             alias.group = target_group
             storage.aliases[alias_name] = alias
             imported_count += 1
 
         storage.save()
+
+        # Record history for group import operation
+        imported_aliases = [storage.get(alias_name) for alias_name in [alias_name for alias_name, _ in data["aliases"].items() if alias_name not in storage.aliases or storage.aliases[alias_name].group != target_group]]
+        if imported_aliases:
+            history_op = {
+                "type": "group_import",
+                "aliases": [alias.to_dict() for alias in imported_aliases],
+                "group_name": target_group,
+                "timestamp": datetime.now().isoformat()
+            }
+            storage.history.push(history_op)
 
         console.print(f"[green]✔[/] Imported {imported_count} aliases to group '{target_group}'")
         if skipped_count > 0:
@@ -983,13 +1200,26 @@ def add(alias_name, tags):
 
     # Add new tags (avoid duplicates)
     original_count = len(alias.tags)
+    original_tags = alias.tags.copy()
+    added_tags = []
     for tag in tags:
         if tag not in alias.tags:
             alias.tags.append(tag)
+            added_tags.append(tag)
 
     if len(alias.tags) > original_count:
         storage.aliases[alias_name] = alias
         storage.save()
+
+        # Record history for tag_add operation
+        history_op = {
+            "type": "tag_add",
+            "aliases": [alias.to_dict()],
+            "added_tags": added_tags,
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
         added_count = len(alias.tags) - original_count
         console.print(f"[green]✓[/] Added {added_count} tag(s) to '{alias_name}'")
         console.print(f"[dim]Current tags: {', '.join(alias.tags)}[/]")
@@ -1009,13 +1239,26 @@ def remove(alias_name, tags):
 
     # Remove specified tags
     original_count = len(alias.tags)
+    original_tags = alias.tags.copy()
+    removed_tags = []
     for tag in tags:
         if tag in alias.tags:
             alias.tags.remove(tag)
+            removed_tags.append(tag)
 
     if len(alias.tags) < original_count:
         storage.aliases[alias_name] = alias
         storage.save()
+
+        # Record history for tag_remove operation
+        history_op = {
+            "type": "tag_remove",
+            "aliases": [alias.to_dict()],
+            "removed_tags": removed_tags,
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
         removed_count = original_count - len(alias.tags)
         console.print(f"[green]✓[/] Removed {removed_count} tag(s) from '{alias_name}'")
         if alias.tags:
@@ -1053,14 +1296,28 @@ def rename(old_tag, new_tag, dry_run):
 
     # Perform the rename
     updated_count = 0
+    updated_aliases = []
     for alias in affected_aliases:
         if old_tag in alias.tags:
             # Replace old tag with new tag
             alias.tags = [new_tag if tag == old_tag else tag for tag in alias.tags]
             storage.aliases[alias.name] = alias
+            updated_aliases.append(alias.to_dict())
             updated_count += 1
 
     storage.save()
+
+    # Record history for tag_rename operation
+    if updated_aliases:
+        history_op = {
+            "type": "tag_rename",
+            "aliases": updated_aliases,
+            "old_tag": old_tag,
+            "new_tag": new_tag,
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
     console.print(f"[green]✓[/] Renamed tag in {updated_count} aliases")
 
 
@@ -1090,13 +1347,26 @@ def delete(tag_name, dry_run):
 
     # Remove the tag
     updated_count = 0
+    updated_aliases = []
     for alias in affected_aliases:
         if tag_name in alias.tags:
             alias.tags.remove(tag_name)
             storage.aliases[alias.name] = alias
+            updated_aliases.append(alias.to_dict())
             updated_count += 1
 
     storage.save()
+
+    # Record history for tag_delete operation
+    if updated_aliases:
+        history_op = {
+            "type": "tag_delete",
+            "aliases": updated_aliases,
+            "deleted_tag": tag_name,
+            "timestamp": datetime.now().isoformat()
+        }
+        storage.history.push(history_op)
+
     console.print(f"[green]✓[/] Removed tag from {updated_count} aliases")
 
 

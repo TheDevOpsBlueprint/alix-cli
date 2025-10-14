@@ -7,7 +7,6 @@ A powerful, htop-style terminal UI for managing shell aliases. Never forget a co
 ![Shell](https://img.shields.io/badge/shell-bash%20|%20zsh%20|%20fish-lightgrey.svg)
 ![CI](https://github.com/YOUR_FORK_USERNAME/alix-cli/workflows/CI/badge.svg)
 
-
 ## ✨ Features
 
 - **Interactive TUI**: Beautiful terminal interface inspired by htop
@@ -130,17 +129,17 @@ alix
 
 #### TUI Keyboard Shortcuts
 
-| Key | Action | Description |
-|-----|--------|-------------|
-| `a` | Add | Add a new alias |
-| `e` | Edit | Edit selected alias |
-| `d` | Delete | Delete selected alias |
-| `/` | Search | Focus search box |
-| `ESC` | Clear | Clear search |
-| `j`/`↓` | Down | Navigate down |
-| `k`/`↑` | Up | Navigate up |
-| `r` | Refresh | Reload from disk |
-| `q` | Quit | Exit application |
+| Key     | Action  | Description           |
+| ------- | ------- | --------------------- |
+| `a`     | Add     | Add a new alias       |
+| `e`     | Edit    | Edit selected alias   |
+| `d`     | Delete  | Delete selected alias |
+| `/`     | Search  | Focus search box      |
+| `ESC`   | Clear   | Clear search          |
+| `j`/`↓` | Down    | Navigate down         |
+| `k`/`↑` | Up      | Navigate up           |
+| `r`     | Refresh | Reload from disk      |
+| `q`     | Quit    | Exit application      |
 
 ### CLI Commands
 
@@ -180,6 +179,94 @@ alix remove <name>
 # Example
 alix remove gs
 ```
+
+#### Undo/Redo Operations
+
+Never worry about mistakes! alix keeps a history of your operations so you can easily undo and redo changes:
+
+```bash
+# Undo the last operation
+alix undo
+
+# Redo the last undone operation
+alix redo
+
+# List undo history (most recent last)
+alix list-undo
+
+# List redo history (most recent last)
+alix list-redo
+```
+
+**Examples:**
+
+```bash
+# Add an alias
+alix add -n "test" -c "echo hello"
+
+# Oops! Let's undo that
+alix undo
+# ✅ Undid add (1 alias removed)
+
+# Changed my mind, let's redo it
+alix redo
+# 🔁 Redid add (1 alias added)
+
+# Delete a group of aliases
+alix group delete docker
+
+# Undo the group removal
+alix undo
+# ✅ Undid group_delete (2 aliases processed)
+
+# View what operations can be undone
+alix list-undo
+# 📚 Undo History (most recent last):
+# Use 'alix undo --id <number>' to undo a specific operation
+#   1. 📁➕ GROUP_ADD deploy
+#       at 2025-10-10 23:00:40
+#   2. 📁➕ GROUP_ADD test1
+#       at 2025-10-10 23:00:49
+#   3. 📁➕ GROUP_ADD test2
+#       at 2025-10-10 23:00:51
+#   4. 📁➕ GROUP_ADD test1
+#       at 2025-10-10 23:02:11
+#   5. 📁➕ GROUP_ADD test1
+#       at 2025-10-10 23:03:41
+#   6. 📁➕ GROUP_ADD test1
+#       at 2025-10-10 23:03:58
+#   7. 📁➕ GROUP_ADD deploy
+#       at 2025-10-11 16:39:44
+#   8. 📁➕ GROUP_ADD test1
+#       at 2025-10-11 16:39:51
+#   9. 📁➕ GROUP_ADD test2
+#       at 2025-10-11 16:39:56
+#   10. ➕ ADD alix-test-echo
+#       at 2025-10-11 16:49:55
+#   11. ➖ REMOVE alix-test-echo
+#       at 2025-10-11 16:49:55
+#   12. ➕ ADD alix-test-echo
+#       at 2025-10-11 16:51:16
+
+# 💡 Tip: Use 'alix undo --id 1' for most recent, 'alix undo --id 20' for oldest
+
+# View what operations can be redone
+alix list-redo
+# 🔄 Redo History (most recent last):
+# Use 'alix redo --id <number>' to redo a specific operation
+#   1. 📁✖️ GROUP_DELETE test2, test1
+#       at 2025-10-11 17:02:50
+
+# 💡 Tip: Use 'alix redo --id 1' for most recent, 'alix redo --id 1' for oldest
+```
+
+**Features:**
+
+- ✅ **Clean emoji formatting**: Consistent, properly formatted messages with emojis
+- 🔄 **Full operation history**: Track add, remove, and remove_group operations
+- ⚡ **Quick navigation**: Easily move back and forth through history
+- 💾 **Persistent storage**: History survives between sessions
+- 🛡️ **Safe operations**: Automatic backups before every change
 
 #### Usage Tracking Commands
 
@@ -224,6 +311,7 @@ alix apply --target ~/.zshrc --dry-run
 ```
 
 Then reload your shell:
+
 ```bash
 # For bash
 source ~/.bashrc
@@ -309,6 +397,7 @@ alix setup-tracking --standalone --output ~/.alix_tracking.sh
 ```
 
 **Analytics Features:**
+
 - **Usage Frequency**: Track how often each alias is used
 - **Productivity Metrics**: See which aliases save the most keystrokes
 - **Usage Patterns**: View daily, weekly, and monthly usage trends
@@ -318,6 +407,7 @@ alix setup-tracking --standalone --output ~/.alix_tracking.sh
 - **Export/Import**: Share analytics data across systems
 
 **Example Output:**
+
 ```
 📊 Alias Statistics & Analytics
 
@@ -459,11 +549,11 @@ Alix stores data in your home directory:
 
 Alix automatically detects your shell and modifies the appropriate config file:
 
-| Shell | Config Files (in priority order) |
-|-------|----------------------------------|
-| Bash | `.bash_aliases`, `.bashrc`, `.bash_profile` |
-| Zsh | `.zsh_aliases`, `.zshrc` |
-| Fish | `.config/fish/config.fish` |
+| Shell | Config Files (in priority order)            |
+| ----- | ------------------------------------------- |
+| Bash  | `.bash_aliases`, `.bashrc`, `.bash_profile` |
+| Zsh   | `.zsh_aliases`, `.zshrc`                    |
+| Fish  | `.config/fish/config.fish`                  |
 
 ### Environment Variables
 
@@ -551,6 +641,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 ### Common Issues
 
 **Issue: `alix: command not found`**
+
 ```bash
 # Ensure virtual environment is activated
 source alix-venv/bin/activate
@@ -560,6 +651,7 @@ export PATH="$HOME/alix-cli/alix-venv/bin:$PATH"
 ```
 
 **Issue: Aliases not appearing in shell**
+
 ```bash
 # After running 'alix apply', reload your shell
 source ~/.bashrc  # or ~/.zshrc
@@ -569,6 +661,7 @@ grep "ALIX MANAGED" ~/.bashrc
 ```
 
 **Issue: TUI colors not displaying correctly**
+
 ```bash
 # Set proper terminal encoding
 export TERM=xterm-256color
@@ -576,6 +669,7 @@ export LC_ALL=en_US.UTF-8
 ```
 
 **Issue: Permission denied errors**
+
 ```bash
 # Fix permissions
 chmod 755 ~/.alix
@@ -603,6 +697,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🙏 Acknowledgments
 
 Built with:
+
 - [Click](https://click.palletsprojects.com/) - CLI framework
 - [Rich](https://rich.readthedocs.io/) - Beautiful terminal formatting
 - [Textual](https://textual.textualize.io/) - Terminal UI framework
