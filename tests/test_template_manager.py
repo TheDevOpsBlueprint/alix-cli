@@ -194,6 +194,181 @@ class TestTemplateManager:
         assert "Imported 1 aliases" in message
         assert mock_storage.add.call_count == 1
 
+    def test_load_templates_skip_invalid_template(self, tmp_path):
+        """Test _load_templates skips invalid templates"""
+        manager = TemplateManager()
+        templates_dir = tmp_path / "templates"
+        templates_dir.mkdir()
+
+        # Create an invalid template (missing required fields)
+        invalid_template = {
+            "version": "1.0",
+            # Missing category, description, aliases
+        }
+
+        with open(templates_dir / "invalid.yaml", "w") as f:
+            yaml.dump(invalid_template, f)
+
+        manager.templates_dir = templates_dir
+        manager._templates = {}
+
+        # This should skip the invalid template
+        manager._load_templates()
+
+        # Should have no templates loaded due to validation failure
+        assert len(manager._templates) == 0
+
+    def test_validate_template_data_invalid_data_type(self):
+        """Test _validate_template_data with invalid data type"""
+        manager = TemplateManager()
+
+        # Test with non-dict data
+        assert not manager._validate_template_data("invalid", "test.yaml")
+        assert not manager._validate_template_data([], "test.yaml")
+        assert not manager._validate_template_data(None, "test.yaml")
+
+    def test_validate_template_data_missing_required_fields(self):
+        """Test _validate_template_data with missing required fields"""
+        manager = TemplateManager()
+
+        # Missing version
+        data = {
+            "category": "test",
+            "description": "test",
+            "aliases": []
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+        # Missing category
+        data = {
+            "version": "1.0",
+            "description": "test",
+            "aliases": []
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+        # Missing description
+        data = {
+            "version": "1.0",
+            "category": "test",
+            "aliases": []
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+        # Missing aliases
+        data = {
+            "version": "1.0",
+            "category": "test",
+            "description": "test"
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+    def test_validate_template_data_invalid_aliases_list(self):
+        """Test _validate_template_data with invalid aliases list"""
+        manager = TemplateManager()
+
+        # Aliases is not a list
+        data = {
+            "version": "1.0",
+            "category": "test",
+            "description": "test",
+            "aliases": "invalid"
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+    def test_validate_template_data_invalid_alias_data(self):
+        """Test _validate_template_data with invalid alias data"""
+        manager = TemplateManager()
+
+        # Alias is not a dict
+        data = {
+            "version": "1.0",
+            "category": "test",
+            "description": "test",
+            "aliases": ["invalid"]
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+    def test_validate_template_data_missing_alias_fields(self):
+        """Test _validate_template_data with missing alias fields"""
+        manager = TemplateManager()
+
+        # Missing name
+        data = {
+            "version": "1.0",
+            "category": "test",
+            "description": "test",
+            "aliases": [{"command": "echo test"}]
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+        # Missing command
+        data = {
+            "version": "1.0",
+            "category": "test",
+            "description": "test",
+            "aliases": [{"name": "test"}]
+        }
+        assert not manager._validate_template_data(data, "test.yaml")
+
+    def test_load_templates_exception_handling(self, tmp_path):
+        """Test _load_templates exception handling"""
+        manager = TemplateManager()
+        templates_dir = tmp_path / "templates"
+        templates_dir.mkdir()
+
+        # Create a file that will cause yaml.safe_load to fail
+        invalid_yaml_file = templates_dir / "invalid.yaml"
+        with open(invalid_yaml_file, "w") as f:
+            f.write("invalid: yaml: content: [\n")
+
+        manager.templates_dir = templates_dir
+        manager._templates = {}
+
+        # This should not raise an exception and should skip the invalid file
+        manager._load_templates()
+
+        # Should have no templates loaded due to exception
+        assert len(manager._templates) == 0
+
+    @patch("alix.template_manager.AliasStorage")
+    def test_import_template_with_skipped_aliases(self, mock_storage_class, temp_templates_dir):
+        """Test import_template with some aliases being skipped"""
+        mock_storage = MagicMock()
+        # First call returns True (imported), second returns False (skipped)
+        mock_storage.add.side_effect = [True, False]
+        mock_storage_class.return_value = mock_storage
+
+        manager = TemplateManager()
+        manager.templates_dir = temp_templates_dir
+        manager._load_templates()
+
+        success, message = manager.import_template("valid")
+
+        assert success is True
+        assert "Imported 1 aliases" in message
+        assert "skipped 1 existing" in message
+        assert mock_storage.add.call_count == 2
+
+    @patch("alix.template_manager.AliasStorage")
+    def test_import_by_category_with_skipped_aliases(self, mock_storage_class, temp_templates_dir):
+        """Test import_by_category with some aliases being skipped"""
+        mock_storage = MagicMock()
+        # First call returns True (imported), second returns False (skipped)
+        mock_storage.add.side_effect = [True, False]
+        mock_storage_class.return_value = mock_storage
+
+        manager = TemplateManager()
+        manager.templates_dir = temp_templates_dir
+        manager._load_templates()
+
+        success, message = manager.import_by_category("test")
+
+        assert success is True
+        assert "Imported 1 aliases" in message
+        assert "skipped 1 existing" in message
+        assert mock_storage.add.call_count == 2
+
     @patch("alix.template_manager.AliasStorage")
     def test_import_template_no_matching_aliases(self, mock_storage_class, temp_templates_dir):
         """Test importing template with no matching aliases"""
