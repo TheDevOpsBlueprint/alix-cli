@@ -201,17 +201,14 @@ class HistoryManager:
 
         elif op_type == "group_delete":
             # inverse: restore group assignments
-            reassign_to = op.get("reassign_to")
             group_name = op.get("group_name")
 
-            # If reassign_to is None, restore to the original group name
-            # If reassign_to has a value, it means aliases were reassigned, so restore to that group
-            restore_group = reassign_to if reassign_to is not None else group_name
+            restore_group = group_name
 
             for a in aliases:
                 try:
                     alias_obj = self._load_alias(a)
-                    alias_obj.group = restore_group  # Restore to correct group
+                    alias_obj.group = restore_group  # Restore to original group
                     storage.aliases[alias_obj.name] = alias_obj
                     performed += 1
                 except Exception:

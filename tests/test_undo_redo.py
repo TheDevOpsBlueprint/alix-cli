@@ -889,9 +889,9 @@ def test_group_delete_undo_redo_with_reassignment(temp_storage):
     msg = temp_storage.history.perform_undo(temp_storage)
     assert "✅" in msg and "Undid group_delete" in msg
 
-    # Verify aliases were restored to the reassigned group (not original)
-    assert temp_storage.get("test1").group == "newgroup"
-    assert temp_storage.get("test2").group == "newgroup"
+    # Verify aliases were restored to the original group
+    assert temp_storage.get("test1").group == "oldgroup"
+    assert temp_storage.get("test2").group == "oldgroup"
 
     # Redo the group delete
     msg = temp_storage.history.perform_redo(temp_storage)
