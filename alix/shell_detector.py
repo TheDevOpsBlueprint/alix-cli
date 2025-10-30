@@ -61,7 +61,7 @@ class ShellDetector:
                 return ShellType.FISH
             elif user_shell.endswith("/sh"):
                 return ShellType.SH
-        except (ImportError, KeyError, AttributeError):
+        except (ImportError, KeyError, AttributeError, OSError, PermissionError, RuntimeError, ValueError):
             pass
 
         # Method 3: macOS-specific detection using dscl (Directory Service Command Line)
@@ -80,17 +80,31 @@ class ShellDetector:
                     timeout=5,
                 )
                 if result.returncode == 0 and result.stdout:
-                    shell_path = result.stdout.split()[-1].lower()
-                    if "zsh" in shell_path:
-                        return ShellType.ZSH
-                    elif "bash" in shell_path:
-                        return ShellType.BASH
-                    elif "fish" in shell_path:
-                        return ShellType.FISH
+                    for line in result.stdout.splitlines():
+                        if line.startswith("UserShell:"):
+                            parts = line.split(":", 1)
+                            if len(parts) == 2:
+                                shell_path = parts[1].strip().lower()
+                                if not shell_path:
+                                    return ShellType.UNKNOWN
+                                if "zsh" in shell_path:
+                                    return ShellType.ZSH
+                                elif "bash" in shell_path:
+                                    return ShellType.BASH
+                                elif "fish" in shell_path:
+                                    return ShellType.FISH
+                                elif shell_path.endswith("sh"):
+                                    return ShellType.SH
+                            return ShellType.UNKNOWN
             except (
                 subprocess.TimeoutExpired,
                 subprocess.CalledProcessError,
                 FileNotFoundError,
+                OSError,
+                PermissionError,
+                RuntimeError,
+                ValueError,
+                Exception,
             ):
                 pass
 
@@ -138,9 +152,18 @@ class ShellDetector:
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    version = result.stdout.strip()
-                    # macOS 10.15+ (Catalina and later) defaults to zsh
-                    major, minor = map(int, version.split(".")[:2])
+                    version_line = result.stdout.strip().splitlines()[0]
+                    parts = version_line.split(".")
+
+                    # Require at least 2 parts, all non-empty and numeric
+                    if len(parts) < 2 or any(p == "" or not p.isdigit() for p in parts):
+                        return ShellType.UNKNOWN
+
+                    try:
+                        major, minor = int(parts[0]), int(parts[1])
+                    except (ValueError, IndexError):
+                        return ShellType.UNKNOWN
+
                     if major >= 11 or (major == 10 and minor >= 15):
                         return ShellType.ZSH
             except (
@@ -148,6 +171,10 @@ class ShellDetector:
                 subprocess.CalledProcessError,
                 ValueError,
                 FileNotFoundError,
+                OSError,
+                PermissionError,
+                RuntimeError,
+                Exception,
             ):
                 pass
 
