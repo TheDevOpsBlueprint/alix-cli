@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict
-import json
+from typing import Dict, List, Optional
 
 # Test alias constants for safe testing
 TEST_ALIAS_NAME = "alix-test-echo"
@@ -13,28 +12,22 @@ TEST_ALIAS_CMD = "echo 'alix test working!'"
 @dataclass
 class UsageRecord:
     """Represents a single usage event of an alias"""
+
     timestamp: datetime
     context: Optional[str] = None  # Additional context like working directory, shell session, etc.
 
     def to_dict(self) -> dict:
         """Convert usage record to dictionary for storage"""
-        return {
-            "timestamp": self.timestamp.isoformat(),
-            "context": self.context
-        }
+        return {"timestamp": self.timestamp.isoformat(), "context": self.context}
 
     @classmethod
     def from_dict(cls, data: dict) -> "UsageRecord":
         """Create usage record from dictionary"""
-        return cls(
-            timestamp=datetime.fromisoformat(data["timestamp"]),
-            context=data.get("context")
-        )
+        return cls(timestamp=datetime.fromisoformat(data["timestamp"]), context=data.get("context"))
 
 
 @dataclass
 class Alias:
-
     """Represents a shell alias with usage tracking"""
 
     name: str
@@ -60,8 +53,7 @@ class Alias:
             "shell": self.shell,
             "last_used": self.last_used.isoformat() if self.last_used else None,
             "usage_history": [record.to_dict() for record in self.usage_history],
-            "group": self.group
-
+            "group": self.group,
         }
 
     @classmethod
@@ -95,7 +87,7 @@ class Alias:
                 "first_used": None,
                 "last_used": self.last_used,
                 "usage_frequency": 0,
-                "recent_usage": []
+                "recent_usage": [],
             }
 
         # Calculate usage frequency (uses per day since creation)
@@ -110,7 +102,7 @@ class Alias:
             "first_used": self.usage_history[0].timestamp if self.usage_history else None,
             "last_used": self.last_used,
             "usage_frequency": usage_frequency,
-            "recent_usage": [record.to_dict() for record in recent_usage]
+            "recent_usage": [record.to_dict() for record in recent_usage],
         }
 
     def __str__(self) -> str:

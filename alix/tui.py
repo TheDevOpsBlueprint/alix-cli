@@ -1,27 +1,18 @@
 import subprocess
+
+from rapidfuzz import fuzz
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical, Center, VerticalScroll
-from textual.widgets import (
-    Header,
-    Footer,
-    DataTable,
-    Input,
-    Button,
-    Label,
-    Static,
-    Checkbox,
-)
 from textual.binding import Binding
-from textual.screen import Screen, ModalScreen
-from datetime import datetime
-from rapidfuzz import fuzz, process
+from textual.containers import Container, Horizontal, VerticalScroll
+from textual.screen import ModalScreen
+from textual.widgets import Button, Checkbox, DataTable, Footer, Input, Label, Static
 
 from alix import __version__
-from alix.storage import AliasStorage
-from alix.models import Alias
-from alix.config import Config
-from alix.shell_integrator import ShellIntegrator  # NEW IMPORT
 from alix.clipboard import ClipboardManager
+from alix.config import Config
+from alix.models import Alias
+from alix.shell_integrator import ShellIntegrator  # NEW IMPORT
+from alix.storage import AliasStorage
 
 
 class AddAliasModal(ModalScreen[bool]):
@@ -133,7 +124,7 @@ class AddAliasModal(ModalScreen[bool]):
             desc = self.query_one("#description", Input).value.strip()
             tags_input = self.query_one("#tags", Input).value.strip()
             force = self.query_one("#force", Checkbox).value
-            
+
             # Parse tags
             tags = []
             if tags_input:
@@ -153,7 +144,10 @@ class AddAliasModal(ModalScreen[bool]):
                             "bash",
                             "-i",
                             "-c",
-                            f"(alias; declare -f) | /usr/bin/which --tty-only --read-alias --read-functions --show-tilde --show-dot {name}",
+                            (
+                                "(alias; declare -f) | /usr/bin/which --tty-only --read-alias "
+                                f"--read-functions --show-tilde --show-dot {name}"
+                            ),
                         ],
                         capture_output=True,
                         text=True,
@@ -162,8 +156,8 @@ class AddAliasModal(ModalScreen[bool]):
                     if cmd.returncode == 0:
                         command_exists = True
                         msg = (
-                            "Alias/Command/Function already exists\nEnable Force Override if you want to override this alias\n"
-                            + cmd.stdout
+                            "Alias/Command/Function already exists\n"
+                            "Enable Force Override if you want to override this alias\n" + cmd.stdout
                         )
                 if command_exists and not force:
                     self.app.notify(
@@ -178,13 +172,9 @@ class AddAliasModal(ModalScreen[bool]):
                         success, message = integrator.apply_single_alias(alias)
 
                         if success:
-                            self.app.notify(
-                                f"Created and applied '{name}'", severity="information"
-                            )
+                            self.app.notify(f"Created and applied '{name}'", severity="information")
                         else:
-                            self.app.notify(
-                                f"Created '{name}' (apply manually)", severity="warning"
-                            )
+                            self.app.notify(f"Created '{name}' (apply manually)", severity="warning")
 
                         self.dismiss(True)
                     else:
@@ -403,9 +393,7 @@ class DeleteConfirmModal(ModalScreen[bool]):
             yield Static("DELETE CONFIRMATION", id="modal-header")
 
             with Container(id="modal-body"):
-                yield Static(
-                    f"Delete alias '{self.alias_name}'?", classes="delete-text"
-                )
+                yield Static(f"Delete alias '{self.alias_name}'?", classes="delete-text")
                 yield Static("This action cannot be undone", classes="warning-text")
 
             with Horizontal(id="button-row"):
@@ -472,9 +460,7 @@ class HelpModal(ModalScreen):
                 yield Static("e - Edit selected alias", classes="help-item")
                 yield Static("d - Delete selected alias", classes="help-item")
                 yield Static("c - Copy alias command", classes="help-item")
-                yield Static(
-                    "p - Apply all aliases to shell config", classes="help-item"
-                )
+                yield Static("p - Apply all aliases to shell config", classes="help-item")
 
                 yield Static("FILTERING", classes="help-category")
                 yield Static("g - Filter by group", classes="help-item")
@@ -609,9 +595,7 @@ class AliasManager(App):
     # MODIFIED: Added 'p' binding for apply all and 'f' for fuzzy search
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True, priority=True),
-        Binding(
-            "c", "copy_alias", "Copy", show=True
-        ),  # copy the alias command to clipboard
+        Binding("c", "copy_alias", "Copy", show=True),  # copy the alias command to clipboard
         Binding("a", "add_alias", "Add", show=True),
         Binding("e", "edit_alias", "Edit", show=True),
         Binding("d", "delete_alias", "Delete", show=True),
@@ -635,7 +619,7 @@ class AliasManager(App):
         self.selected_alias = None
         self.fuzzy_search_enabled = False  # NEW: Fuzzy search toggle
         self._current_group_filter = None  # NEW: Group filter state
-        self._current_tag_filter = None    # NEW: Tag filter state
+        self._current_tag_filter = None  # NEW: Tag filter state
 
     def compose(self) -> ComposeResult:
         # Header
@@ -657,9 +641,7 @@ class AliasManager(App):
                     yield Button("Add New", variant="success", id="btn-add")
                     yield Button("Edit", variant="warning", id="btn-edit")
                     yield Button("Delete", variant="error", id="btn-delete")
-                    yield Button(
-                        "Apply All", variant="primary", id="btn-apply"
-                    )  # NEW BUTTON
+                    yield Button("Apply All", variant="primary", id="btn-apply")  # NEW BUTTON
                     yield Button("Refresh", variant="default", id="btn-refresh")
 
                 # Info panel
@@ -691,7 +673,7 @@ class AliasManager(App):
         aliases = sorted(self.storage.list_all(), key=lambda a: a.name)
 
         # Apply group filter
-        current_group_filter = getattr(self, '_current_group_filter', None)
+        current_group_filter = getattr(self, "_current_group_filter", None)
         if current_group_filter and current_group_filter not in ["All Groups"]:
             if current_group_filter == "Ungrouped":
                 aliases = [a for a in aliases if not a.group]
@@ -699,7 +681,7 @@ class AliasManager(App):
                 aliases = [a for a in aliases if a.group == current_group_filter]
 
         # Apply tag filter
-        current_tag_filter = getattr(self, '_current_tag_filter', None)
+        current_tag_filter = getattr(self, "_current_tag_filter", None)
         if current_tag_filter and current_tag_filter not in ["All Tags"]:
             if current_tag_filter == "Untagged":
                 aliases = [a for a in aliases if not a.tags]
@@ -712,18 +694,10 @@ class AliasManager(App):
                 results = []
                 for alias in aliases:
                     # Search across name, command, and description
-                    name_score = fuzz.partial_ratio(
-                        search_term.lower(), alias.name.lower()
-                    )
-                    cmd_score = fuzz.partial_ratio(
-                        search_term.lower(), alias.command.lower()
-                    )
+                    name_score = fuzz.partial_ratio(search_term.lower(), alias.name.lower())
+                    cmd_score = fuzz.partial_ratio(search_term.lower(), alias.command.lower())
                     desc_score = (
-                        fuzz.partial_ratio(
-                            search_term.lower(), alias.description.lower()
-                        )
-                        if alias.description
-                        else 0
+                        fuzz.partial_ratio(search_term.lower(), alias.description.lower()) if alias.description else 0
                     )
 
                     # Use the highest score
@@ -761,34 +735,6 @@ class AliasManager(App):
 
         self.update_status(len(aliases))
 
-    def update_status(self, shown: int = None) -> None:
-        status = self.query_one("#status-bar", Static)
-        total = len(self.storage.list_all())
-
-        # Add fuzzy search indicator
-        fuzzy_status = (
-            "[green]Fuzzy ON[/]" if self.fuzzy_search_enabled else "[dim]Fuzzy OFF[/]"
-        )
-
-        # Add filter indicators
-        filter_text = ""
-        current_group_filter = getattr(self, '_current_group_filter', None)
-        current_tag_filter = getattr(self, '_current_tag_filter', None)
-        
-        if current_group_filter and current_group_filter != "All Groups":
-            filter_text += f" | Group: {current_group_filter}"
-        if current_tag_filter and current_tag_filter != "All Tags":
-            filter_text += f" | Tag: {current_tag_filter}"
-
-        if shown is not None:
-            status.update(
-                f"Showing {shown} of {total} aliases | {fuzzy_status}{filter_text} | Press 'p' to apply all"
-            )
-        else:
-            status.update(
-                f"Total: {total} aliases | {fuzzy_status}{filter_text} | Press 'p' to apply all"
-            )
-
     def update_info_panel(self, alias: Alias) -> None:
         info = self.query_one("#info-content", Static)
         # Escape any markup characters in the alias data
@@ -800,7 +746,7 @@ class AliasManager(App):
 
         tags_text = Text(", ".join(alias.tags) if alias.tags else "None")
         group_text = Text(alias.group or "None")
-        
+
         info.update(
             Text.assemble(
                 ("Name: ", "bold"),
@@ -853,7 +799,7 @@ class AliasManager(App):
         try:
             clipboard.copy(alias_cmd)
             self.notify("Alias command copied to clipboard")
-        except:
+        except Exception:
             self.notify(f"Unable to copy. Command: {alias_cmd}")
 
     def action_edit_alias(self) -> None:
@@ -877,9 +823,7 @@ class AliasManager(App):
                         self.refresh_table()
                         self.notify(f"Deleted '{self.selected_alias.name}'")
                         self.selected_alias = None
-                        self.query_one("#info-content", Static).update(
-                            "Select an alias"
-                        )
+                        self.query_one("#info-content", Static).update("Select an alias")
                         # Reapply all to remove deleted alias from shell
                         integrator = ShellIntegrator()
                         integrator.apply_aliases()
@@ -938,9 +882,7 @@ class AliasManager(App):
         success, message = integrator.apply_aliases(target_file)
 
         if success:
-            self.notify(
-                f"Applied all aliases to {target_file.name}", severity="success"
-            )
+            self.notify(f"Applied all aliases to {target_file.name}", severity="success")
             self.update_status()
         else:
             self.notify(f"Failed: {message}", severity="error")
@@ -957,7 +899,7 @@ class AliasManager(App):
             self.action_apply_all()
         elif event.button.id == "btn-refresh":
             self.action_refresh()
-    
+
     def action_filter_by_group(self) -> None:
         # Always build group list from ALL aliases
         all_aliases = self.storage.list_all()
@@ -965,7 +907,7 @@ class AliasManager(App):
         groups_list = ["All Groups"] + groups + ["Ungrouped"]
 
         # Find current filter and cycle to next
-        current_filter = getattr(self, '_current_group_filter', None)
+        current_filter = getattr(self, "_current_group_filter", None)
         try:
             idx = groups_list.index(current_filter) if current_filter in groups_list else 0
             next_idx = (idx + 1) % len(groups_list)
@@ -988,25 +930,25 @@ class AliasManager(App):
         """Filter aliases by group"""
         aliases = self.storage.list_all()
         groups = set()
-        
+
         # Collect all unique groups
         for alias in aliases:
             if alias.group:
                 groups.add(alias.group)
-        
+
         if not groups:
             self.notify("No groups found. Create some aliases with groups first.", severity="warning")
             return
-        
+
         # Create a simple group selection dialog
         groups_list = sorted(list(groups))
         groups_list.insert(0, "All Groups")  # Add option to show all
-        groups_list.append("Ungrouped")      # Add option to show ungrouped
-        
+        groups_list.append("Ungrouped")  # Add option to show ungrouped
+
         # For now, we'll use a simple approach - cycle through groups
         # In a more advanced implementation, you could create a proper selection modal
-        current_filter = getattr(self, '_current_group_filter', None)
-        
+        current_filter = getattr(self, "_current_group_filter", None)
+
         if current_filter is None:
             # Start with first group
             selected_group = groups_list[0]
@@ -1018,9 +960,9 @@ class AliasManager(App):
                 selected_group = groups_list[next_index]
             except ValueError:
                 selected_group = groups_list[0]
-        
+
         self._current_group_filter = selected_group
-        
+
         # Apply the filter
         if selected_group == "All Groups":
             self.notify("Showing all aliases", severity="information")
@@ -1034,32 +976,32 @@ class AliasManager(App):
         # Always build tag list from ALL aliases
         all_aliases = self.storage.list_all()
         tags = set()
-        
+
         # Collect all unique tags
         for alias in all_aliases:
             tags.update(alias.tags)
-        
+
         if not tags:
             self.notify("No tags found. Create some aliases with tags first.", severity="warning")
             return
-        
+
         # Create tag list with special options
         tags_list = ["All Tags"] + sorted(list(tags)) + ["Untagged"]
-        
+
         # Find current filter and cycle to next
-        current_filter = getattr(self, '_current_tag_filter', None)
+        current_filter = getattr(self, "_current_tag_filter", None)
         try:
             idx = tags_list.index(current_filter) if current_filter in tags_list else 0
             next_idx = (idx + 1) % len(tags_list)
         except ValueError:
             next_idx = 0
-        
+
         selected_tag = tags_list[next_idx]
         self._current_tag_filter = selected_tag
-        
+
         # Refresh table with new filter
         self.refresh_table()
-        
+
         # Notify user
         if selected_tag == "All Tags":
             self.notify("Showing all aliases", severity="information")
@@ -1072,7 +1014,7 @@ class AliasManager(App):
         status = self.query_one("#status-bar", Static)
         total = len(self.storage.list_all())
 
-        current_filter = getattr(self, '_current_group_filter', None)
+        current_filter = getattr(self, "_current_group_filter", None)
         filter_text = ""
         if current_filter and current_filter != "All Groups":
             filter_text = f" | Filter: {current_filter}"

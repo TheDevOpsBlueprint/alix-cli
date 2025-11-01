@@ -20,9 +20,9 @@ class TestConfig:
     def test_init(self):
         """Test Config initialization"""
         config = Config()
-        assert hasattr(config, 'config_dir')
-        assert hasattr(config, 'config_path')
-        assert hasattr(config, 'config')
+        assert hasattr(config, "config_dir")
+        assert hasattr(config, "config_path")
+        assert hasattr(config, "config")
         assert isinstance(config.config, dict)
 
     def test_load_no_config_file(self, temp_config_dir):

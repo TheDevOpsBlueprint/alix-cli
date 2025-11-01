@@ -1,6 +1,5 @@
 """Test fuzzy search functionality"""
 
-import pytest
 from rapidfuzz import fuzz
 
 

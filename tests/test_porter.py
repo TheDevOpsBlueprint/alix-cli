@@ -1,9 +1,9 @@
 from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
+from alix.models import Alias
 from alix.porter import AliasPorter
 from alix.storage import AliasStorage
-from alix.models import Alias
 
 
 def test_export_to_dict__from_list(alias_list, porter_data):
@@ -35,9 +35,7 @@ def test_export_to_file__json(mock_json, mock_exporter, porter_data):
         result = porter.export_to_file((Path("/tmp/aliases.json")))
 
     assert result == (True, "Exported 2 aliases to aliases.json")
-    mock_json.dump.assert_called_once_with(
-        porter_data, mocked_open(), indent=2, default=str
-    )
+    mock_json.dump.assert_called_once_with(porter_data, mocked_open(), indent=2, default=str)
 
 
 @patch.object(AliasPorter, "export_to_dict")
@@ -52,9 +50,7 @@ def test_export_to_file__yaml(mock_yaml, mock_exporter, porter_data):
         result = porter.export_to_file((Path("/tmp/aliases.json")), format="yaml")
 
     assert result == (True, "Exported 2 aliases to aliases.json")
-    mock_yaml.dump.assert_called_once_with(
-        porter_data, mocked_open(), default_flow_style=False, sort_keys=False
-    )
+    mock_yaml.dump.assert_called_once_with(porter_data, mocked_open(), default_flow_style=False, sort_keys=False)
 
 
 @patch.object(AliasPorter, "export_to_dict")
@@ -84,9 +80,7 @@ def test_import_from_file__json(mock_json, alias, porter_data):
     porter = AliasPorter()
     porter.storage = mock_storage
 
-    with patch("alix.porter.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = True
 
         result = porter.import_from_file(Path("/tmp/alias.json"))
@@ -94,10 +88,7 @@ def test_import_from_file__json(mock_json, alias, porter_data):
     assert result == (True, "Imported 1 aliases")
     assert len(mock_storage.aliases) == 1
     assert mock_storage.aliases["alix-test-echo"] == alias
-    assert (
-        str(mock_storage.aliases["alix-test-echo"])
-        == "alix-test-echo='alix test working!'"
-    )
+    assert str(mock_storage.aliases["alix-test-echo"]) == "alix-test-echo='alix test working!'"
     mock_storage.save.assert_called_once()
 
 
@@ -111,9 +102,7 @@ def test_import_from_file__alias_exists_no_merge(mock_yaml, alias, porter_data):
     porter = AliasPorter()
     porter.storage = mock_storage
 
-    with patch("alix.porter.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = True
 
         result = porter.import_from_file(Path("/tmp/alias.yaml"))
@@ -129,9 +118,7 @@ def test_import_from_file__not_found():
 
     porter = AliasPorter()
 
-    with patch("alix.porter.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = False
 
         result = porter.import_from_file(Path("/tmp/alias.json"))
@@ -150,9 +137,7 @@ def test_import_from_file__no_aliases_in_file(mock_json):
     porter = AliasPorter()
     porter.storage = mock_storage
 
-    with patch("alix.porter.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = True
 
         result = porter.import_from_file(Path("/tmp/alias.json"))
@@ -168,9 +153,7 @@ def test_import_from_file__failed():
 
     porter = AliasPorter()
 
-    with patch("alix.porter.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = True
 
         result = porter.import_from_file(Path("/tmp/alias.json"))
@@ -245,7 +228,7 @@ class TestPorterTagFiltering:
             "aliases": [
                 {"name": "alias1", "command": "echo 1", "tags": ["tag1"]},
                 {"name": "alias2", "command": "echo 2", "tags": ["tag2"]},
-                {"name": "alias3", "command": "echo 3", "tags": ["tag1", "tag2"]}
+                {"name": "alias3", "command": "echo 3", "tags": ["tag1", "tag2"]},
             ]
         }
         mock_json.load.return_value = import_data
@@ -253,9 +236,7 @@ class TestPorterTagFiltering:
         porter = AliasPorter()
         porter.storage = mock_storage
 
-        with patch("alix.porter.open", mocked_open), patch(
-            "pathlib.Path.exists", autospec=True
-        ) as mock_exists:
+        with patch("alix.porter.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
             mock_exists.return_value = True
 
             result = porter.import_from_file(Path("/tmp/test.json"), tag_filter="tag1")

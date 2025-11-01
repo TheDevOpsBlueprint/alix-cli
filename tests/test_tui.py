@@ -31,9 +31,7 @@ async def test_add_alias(mock_storage, mock_notify, mock_apply, alias_min):
 
         await pilot.pause()  # Wait for async operations to complete
 
-        mock_notify.assert_any_call(
-            "Created and applied 'alix-test-echo'", severity="information"
-        )
+        mock_notify.assert_any_call("Created and applied 'alix-test-echo'", severity="information")
         mock_notify.assert_any_call("Alias added and applied successfully")
         mock_storage.return_value.add.assert_called_once_with(alias_min)
         mock_apply.assert_called_once_with(alias_min)

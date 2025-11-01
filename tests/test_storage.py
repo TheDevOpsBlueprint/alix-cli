@@ -1,10 +1,10 @@
 from pathlib import Path
-from unittest.mock import Mock, mock_open, patch, call
+from unittest.mock import Mock, call, mock_open, patch
 
 from freezegun import freeze_time
 
-from alix.storage import AliasStorage
 from alix.models import Alias
+from alix.storage import AliasStorage
 
 
 @patch.object(AliasStorage, "load")
@@ -12,11 +12,7 @@ from alix.models import Alias
 def test_init__default_path(mock_mkdir, mock_load):
     AliasStorage()
 
-    mock_mkdir.assert_has_calls([
-        call(exist_ok=True),
-        call(exist_ok=True),
-        call(parents=True, exist_ok=True)
-    ])
+    mock_mkdir.assert_has_calls([call(exist_ok=True), call(exist_ok=True), call(parents=True, exist_ok=True)])
     mock_load.assert_called_once()
 
 
@@ -27,10 +23,7 @@ def test_init__custom_path(mock_mkdir, mock_load):
 
     AliasStorage(storage_path=expected_storage_path)
 
-    mock_mkdir.assert_has_calls([
-        call(exist_ok=True),
-        call(parents=True, exist_ok=True)
-    ])
+    mock_mkdir.assert_has_calls([call(exist_ok=True), call(parents=True, exist_ok=True)])
     mock_load.assert_called_once()
 
 
@@ -82,9 +75,7 @@ def test_load(storage_file_raw_data, alias):
     storage = AliasStorage()
 
     mocked_open = mock_open(read_data=storage_file_raw_data)
-    with patch("alix.storage.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists:
+    with patch("alix.storage.open", mocked_open), patch("pathlib.Path.exists", autospec=True) as mock_exists:
         mock_exists.return_value = True
 
         storage.load()
@@ -100,9 +91,11 @@ def test_load__corrupted_file():
 
     storage = AliasStorage()
 
-    with patch("alix.storage.open", mocked_open), patch(
-        "pathlib.Path.exists", autospec=True
-    ) as mock_exists, patch("pathlib.Path.rename", autospec=True) as mock_rename:
+    with (
+        patch("alix.storage.open", mocked_open),
+        patch("pathlib.Path.exists", autospec=True) as mock_exists,
+        patch("pathlib.Path.rename", autospec=True) as mock_rename,
+    ):
         mock_exists.return_value = True
 
         storage.load()
@@ -128,9 +121,7 @@ def test_add(mock_json, alias, storage_file_data):
     assert result is True
     assert storage.aliases["alix-test-echo"] == alias
     mock_backup.assert_called_once()
-    mock_json.dump.assert_called_once_with(
-        storage_file_data, mocked_open(), indent=2, default=str
-    )
+    mock_json.dump.assert_called_once_with(storage_file_data, mocked_open(), indent=2, default=str)
 
 
 @patch("alix.storage.json")
@@ -241,7 +232,9 @@ def test_restore_latest_backup__no_backups(mock_shutil):
 class TestStorageGroupAndTagMethods:
     """Test storage methods for groups and tags"""
 
-    def test_clear_test_alias(self,):
+    def test_clear_test_alias(
+        self,
+    ):
         """Test clear_test_alias method"""
         storage = AliasStorage()
         test_alias = Alias(name="alix-test-echo", command="echo test")
@@ -265,11 +258,7 @@ class TestStorageGroupAndTagMethods:
         alias2 = Alias(name="alias2", command="echo 2", group="group1")
         alias3 = Alias(name="alias3", command="echo 3", group="group2")
 
-        storage.aliases = {
-            "alias1": alias1,
-            "alias2": alias2,
-            "alias3": alias3
-        }
+        storage.aliases = {"alias1": alias1, "alias2": alias2, "alias3": alias3}
 
         group1_aliases = storage.get_by_group("group1")
         group2_aliases = storage.get_by_group("group2")
@@ -291,12 +280,7 @@ class TestStorageGroupAndTagMethods:
         alias3 = Alias(name="alias3", command="echo 3", group="group1")
         alias4 = Alias(name="alias4", command="echo 4")
 
-        storage.aliases = {
-            "alias1": alias1,
-            "alias2": alias2,
-            "alias3": alias3,
-            "alias4": alias4
-        }
+        storage.aliases = {"alias1": alias1, "alias2": alias2, "alias3": alias3, "alias4": alias4}
 
         groups = storage.get_groups()
 
@@ -328,11 +312,7 @@ class TestStorageGroupAndTagMethods:
             alias2 = Alias(name="alias2", command="echo 2", group="group1")
             alias3 = Alias(name="alias3", command="echo 3", group="group2")
 
-            storage.aliases = {
-                "alias1": alias1,
-                "alias2": alias2,
-                "alias3": alias3
-            }
+            storage.aliases = {"alias1": alias1, "alias2": alias2, "alias3": alias3}
 
             storage.save()
 
@@ -363,11 +343,7 @@ class TestStorageGroupAndTagMethods:
         alias2 = Alias(name="alias2", command="echo 2", tags=["tag2"])
         alias3 = Alias(name="alias3", command="echo 3", tags=["tag3"])
 
-        storage.aliases = {
-            "alias1": alias1,
-            "alias2": alias2,
-            "alias3": alias3
-        }
+        storage.aliases = {"alias1": alias1, "alias2": alias2, "alias3": alias3}
 
         tag1_aliases = storage.get_by_tag("tag1")
         tag2_aliases = storage.get_by_tag("tag2")
@@ -389,11 +365,7 @@ class TestStorageGroupAndTagMethods:
         alias2 = Alias(name="alias2", command="echo 2", tags=["tag2", "tag3"])
         alias3 = Alias(name="alias3", command="echo 3", tags=[])
 
-        storage.aliases = {
-            "alias1": alias1,
-            "alias2": alias2,
-            "alias3": alias3
-        }
+        storage.aliases = {"alias1": alias1, "alias2": alias2, "alias3": alias3}
 
         tags = storage.get_tags()
 
@@ -407,11 +379,7 @@ class TestStorageGroupAndTagMethods:
         alias2 = Alias(name="alias2", command="echo 2", tags=["tag2"])
         alias3 = Alias(name="alias3", command="echo 3", tags=["tag1"])
 
-        storage.aliases = {
-            "alias1": alias1,
-            "alias2": alias2,
-            "alias3": alias3
-        }
+        storage.aliases = {"alias1": alias1, "alias2": alias2, "alias3": alias3}
 
         tag_counts = storage.get_tag_counts()
 
@@ -430,10 +398,7 @@ class TestStorageGroupAndTagMethods:
             alias1 = Alias(name="alias1", command="echo 1", group="group1")
             alias2 = Alias(name="alias2", command="echo 2", group="group1")
 
-            storage.aliases = {
-                "alias1": alias1,
-                "alias2": alias2
-            }
+            storage.aliases = {"alias1": alias1, "alias2": alias2}
 
             def mock_remove(name, record_history=False):
                 return False

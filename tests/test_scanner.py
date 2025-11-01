@@ -1,14 +1,13 @@
+from pathlib import Path
+from unittest.mock import Mock, patch
+
 from alix.scanner import AliasScanner
 from alix.shell_detector import ShellDetector, ShellType
-from unittest.mock import patch, Mock
-from pathlib import Path
 
 
 @patch.object(ShellDetector, "find_config_files")
 @patch.object(ShellDetector, "detect_current_shell")
-def test_scan_system(
-    mock_detect_current_shell, mock_find_config_files, shell_file_data
-):
+def test_scan_system(mock_detect_current_shell, mock_find_config_files, shell_file_data):
     mock_detect_current_shell.return_value = ShellType.ZSH
     mock_path = Mock(spec=Path)
     mock_path.name = ".zshrc"
@@ -42,9 +41,7 @@ def test_scan_system__no_aliases(mock_detect_current_shell, mock_find_config_fil
 
 @patch("alix.scanner.subprocess")
 @patch.object(ShellDetector, "detect_current_shell")
-def test_get_active_aliases(
-    mock_detect_current_shell, mock_subprocess, shell_file_data
-):
+def test_get_active_aliases(mock_detect_current_shell, mock_subprocess, shell_file_data):
     mock_detect_current_shell.return_value = ShellType.ZSH
     mock_stdout = f"{shell_file_data}\n{shell_file_data}"
     mock_subprocess.run.return_value.returncode = 0

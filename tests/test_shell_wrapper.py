@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import Mock, patch
 
 from alix.shell_wrapper import ShellWrapper
 
@@ -122,7 +122,7 @@ class TestShellWrapper:
 
         assert "Alix CLI Usage Tracking Integration for Fish" in result
         # Since there are no aliases, no functions are generated
-        assert "echo \"Alix usage tracking enabled for 0 aliases\"" in result
+        assert 'echo "Alix usage tracking enabled for 0 aliases"' in result
 
     @patch("alix.shell_wrapper.os.chmod")
     def test_create_standalone_tracking_script_directory_creation(self, mock_chmod):
