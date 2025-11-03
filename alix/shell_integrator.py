@@ -71,9 +71,20 @@ class ShellIntegrator:
         end_idx = content.find(self.ALIX_MARKER_END)
 
         old_alix = ""
-        if start_idx != -1 and end_idx != -1:
-            old_alix = content[start_idx:]
+        if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+            old_alix = content[start_idx:end_idx + len(self.ALIX_MARKER_END)]
             content = content[:start_idx] + content[end_idx + len(self.ALIX_MARKER_END) + 1:]
+        elif start_idx != -1:
+            # Incomplete start marker, remove content after it
+            old_alix = ""
+            content = content[:start_idx]
+        elif end_idx != -1:
+            # Incomplete end marker, remove non-comment content before it
+            old_alix = ""
+            before = content[:end_idx]
+            lines = before.split('\n')
+            kept_lines = [line for line in lines if line.strip().startswith('#') or line.strip() == '']
+            content = '\n'.join(kept_lines) + '\n' + content[end_idx + len(self.ALIX_MARKER_END) + 1:]
 
         # Add new aliases section
         aliases_section = f"\n{self.ALIX_MARKER_START}\n"
@@ -81,7 +92,7 @@ class ShellIntegrator:
         aliases_section += self.export_aliases(self.shell_type)
         aliases_section += f"\n{self.ALIX_MARKER_END}\n"
 
-        return (old_alix, aliases_section)
+        return (old_alix, content + aliases_section)
 
     def apply_aliases(self, target_file: Optional[Path] = None) -> Tuple[bool, str]:
         """Apply aliases to shell configuration file"""
