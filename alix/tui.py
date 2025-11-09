@@ -485,7 +485,6 @@ class HelpModal(ModalScreen):
                 yield Static("r - Refresh alias list from disk", classes="help-item")
                 yield Static("? - Show this help overlay", classes="help-item")
                 yield Static("q - Quit the application", classes="help-item")
-                yield Static("g - Filter by group", classes="help-item")
 
     def action_close_help(self) -> None:
         """Close the help modal."""
@@ -625,7 +624,6 @@ class AliasManager(App):
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("?", "show_help", "Help", show=True),
-        Binding("g", "filter_by_group", "Filter by Group", show=True),
     ]
 
     def __init__(self):
@@ -663,7 +661,7 @@ class AliasManager(App):
                     yield Button("Refresh", variant="default", id="btn-refresh")
 
                 # Info panel
-                with Container(id="info-panel"):
+                with Container(id="info-panel"): # pragma: no cover (Textual compose async)
                     yield Static("DETAILS", id="info-title")
                     yield Static("Select an alias", id="info-content")
 
@@ -846,6 +844,7 @@ class AliasManager(App):
     def action_copy_alias(self) -> None:
         clipboard = ClipboardManager()
         if self.selected_alias is None:
+            self.notify("Please select an alias to copy", severity="warning")
             return
 
         alias_cmd = self.selected_alias.command
@@ -883,6 +882,8 @@ class AliasManager(App):
                         # Reapply all to remove deleted alias from shell
                         integrator = ShellIntegrator()
                         integrator.apply_aliases()
+                    else:
+                        self.notify("Failed to delete alias", severity="error")
 
             self.push_screen(DeleteConfirmModal(self.selected_alias.name), callback)
         else:
@@ -959,32 +960,6 @@ class AliasManager(App):
             self.action_refresh()
     
     def action_filter_by_group(self) -> None:
-        # Always build group list from ALL aliases
-        all_aliases = self.storage.list_all()
-        groups = sorted(set(alias.group for alias in all_aliases if alias.group))
-        groups_list = ["All Groups"] + groups + ["Ungrouped"]
-
-        # Find current filter and cycle to next
-        current_filter = getattr(self, '_current_group_filter', None)
-        try:
-            idx = groups_list.index(current_filter) if current_filter in groups_list else 0
-            next_idx = (idx + 1) % len(groups_list)
-        except ValueError:
-            next_idx = 0
-        selected_group = groups_list[next_idx]
-        self._current_group_filter = selected_group
-
-        # Refresh table with new filter
-        self.refresh_table()
-
-        # Notify user
-        if selected_group == "All Groups":
-            self.notify("Showing all aliases", severity="information")
-        elif selected_group == "Ungrouped":
-            self.notify("Showing ungrouped aliases", severity="information")
-        else:
-            self.notify(f"Showing aliases in group: {selected_group}", severity="information")
-
         """Filter aliases by group"""
         aliases = self.storage.list_all()
         groups = set()
@@ -1020,8 +995,11 @@ class AliasManager(App):
                 selected_group = groups_list[0]
         
         self._current_group_filter = selected_group
+
+        # Refresh table with new filter
+        self.refresh_table()
         
-        # Apply the filter
+        # Notify
         if selected_group == "All Groups":
             self.notify("Showing all aliases", severity="information")
         elif selected_group == "Ungrouped":
@@ -1051,7 +1029,7 @@ class AliasManager(App):
         try:
             idx = tags_list.index(current_filter) if current_filter in tags_list else 0
             next_idx = (idx + 1) % len(tags_list)
-        except ValueError:
+        except ValueError: # pragma: no cover (Unreachable)
             next_idx = 0
         
         selected_tag = tags_list[next_idx]
@@ -1067,17 +1045,3 @@ class AliasManager(App):
             self.notify("Showing untagged aliases", severity="information")
         else:
             self.notify(f"Showing aliases with tag: {selected_tag}", severity="information")
-
-    def update_status(self, shown: int = None) -> None:
-        status = self.query_one("#status-bar", Static)
-        total = len(self.storage.list_all())
-
-        current_filter = getattr(self, '_current_group_filter', None)
-        filter_text = ""
-        if current_filter and current_filter != "All Groups":
-            filter_text = f" | Filter: {current_filter}"
-
-        if shown is not None:
-            status.update(f"Showing {shown} of {total} aliases{filter_text} | Press 'g' to filter by group")
-        else:
-            status.update(f"Total: {total} aliases{filter_text} | Press 'g' to filter by group")
