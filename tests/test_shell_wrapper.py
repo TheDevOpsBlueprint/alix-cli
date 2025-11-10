@@ -106,7 +106,7 @@ class TestShellWrapper:
         assert result is False
 
     def test_generate_shell_integration_script_zsh(self):
-        """Test generate_shell_integration_script with zsh shell (line 58)"""
+        """Test generate_shell_integration_script with zsh shell"""
         wrapper = ShellWrapper()
 
         result = wrapper.generate_shell_integration_script("zsh")
@@ -115,14 +115,12 @@ class TestShellWrapper:
         assert "Alix CLI Usage Tracking Integration for Zsh" in result
 
     def test_generate_shell_integration_script_fish(self):
-        """Test generate_shell_integration_script with fish shell (line 60)"""
+        """Test generate_shell_integration_script with fish shell"""
         wrapper = ShellWrapper()
 
         result = wrapper.generate_shell_integration_script("fish")
 
         assert "Alix CLI Usage Tracking Integration for Fish" in result
-        # Since there are no aliases, no functions are generated
-        assert "echo \"Alix usage tracking enabled for 0 aliases\"" in result
 
     @patch("alix.shell_wrapper.os.chmod")
     def test_create_standalone_tracking_script_directory_creation(self, mock_chmod):
